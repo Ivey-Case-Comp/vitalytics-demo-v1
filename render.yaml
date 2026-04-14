@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: vitalytics-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # you will set this manually in Render dashboard
+      - key: FRONTEND_URL
+        value: https://vitalytics-demo-v1.vercel.app
+      - key: DEMO_MOCK
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.12"
