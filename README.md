@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vitalytics
 
-## Getting Started
+Synthetic healthcare data generation pipeline. Next.js frontend + FastAPI backend with a Claude-powered agent loop.
 
-First, run the development server:
+## Stack
+
+- **Frontend:** Next.js 16, React 19, Tailwind 4, Radix UI, Recharts
+- **Backend:** FastAPI, Anthropic SDK, pandas/numpy/scipy/scikit-learn
+- **Deploy:** Vercel (frontend) + Render (backend) — see [vercel.json](vercel.json) and [render.yaml](render.yaml)
+
+## Prerequisites
+
+- Node.js 20+
+- Python 3.9+
+- git
+
+## Quick Setup
+
+### 1. Clone and install the frontend
+
+```bash
+git clone <repo-url> vitalytics-demo-v1
+cd vitalytics-demo-v1
+npm install
+```
+
+### 2. Install the backend
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Configure environment variables
+
+Create `backend/.env`:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...   # get your own at https://console.anthropic.com
+FRONTEND_URL=http://localhost:3000
+```
+
+> **No API key yet?** Set `DEMO_MOCK=true` in `backend/.env` instead — the agent returns canned responses so you can run the full app end-to-end without a key. See [backend/agent/react_loop.py:173](backend/agent/react_loop.py:173).
+>
+> **Note:** Claude Pro (the chat subscription) does not include API access. API keys are billed separately via the Anthropic Console.
+
+No frontend `.env` is needed for local dev — the API URL defaults to `http://localhost:8000` per [next.config.ts:9](next.config.ts:9). To override, create `.env.local` at the repo root:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### 4. Run it (two terminals)
+
+**Terminal 1 — backend:**
+
+```bash
+cd backend
+source venv/bin/activate
+uvicorn main:app --reload --port 8000
+```
+
+**Terminal 2 — frontend:**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Sanity checks
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `curl http://localhost:8000/docs` — FastAPI Swagger UI loads
+- Frontend home page loads with no console errors
+- Upload a CSV and run the agent — if you see mock output, `DEMO_MOCK` is on
 
-## Learn More
+## Troubleshooting
 
-To learn more about Next.js, take a look at the following resources:
+| Symptom | Fix |
+| --- | --- |
+| CORS error in browser console | Confirm `FRONTEND_URL` in `backend/.env` matches the Next.js origin |
+| `anthropic.AuthenticationError` | API key missing or invalid — set `DEMO_MOCK=true` to unblock |
+| Port 8000 already in use | Run `uvicorn main:app --reload --port 8001` and set `NEXT_PUBLIC_API_URL=http://localhost:8001` in `.env.local` |
+| `ModuleNotFoundError` on backend start | Make sure the venv is activated (`source backend/venv/bin/activate`) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project layout
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/          Next.js app router pages and layouts
+components/   React components (Radix + Tailwind)
+lib/          Frontend utilities
+backend/
+  main.py           FastAPI entry point
+  agent/            Claude ReAct loop
+  tools/            Pipeline tools (metadata, hygiene, generate, verify)
+  data/synthea/     Sample healthcare data
+```
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Frontend** → Vercel (auto-routes `/api/*` to the backend — see [vercel.json](vercel.json))
+- **Backend** → Render (config in [render.yaml](render.yaml)). Set `ANTHROPIC_API_KEY` and `FRONTEND_URL` in the Render dashboard.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Secrets
+
+**Do not share `.env` files or API keys over chat/email.** Each developer should generate their own key at [console.anthropic.com](https://console.anthropic.com), or use `DEMO_MOCK=true` while getting set up.
