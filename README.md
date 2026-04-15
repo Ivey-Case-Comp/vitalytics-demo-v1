@@ -6,7 +6,7 @@ Synthetic healthcare data generation pipeline. Next.js frontend + FastAPI backen
 
 - **Frontend:** Next.js 16, React 19, Tailwind 4, Radix UI, Recharts
 - **Backend:** FastAPI, Anthropic SDK, pandas/numpy/scipy/scikit-learn
-- **Deploy:** Vercel (frontend) + Render (backend) — see [vercel.json](vercel.json) and [render.yaml](render.yaml)
+- **Deploy:** Vercel (frontend + backend via `experimentalServices`) — see [vercel.json](vercel.json)
 
 ## Prerequisites
 
@@ -100,8 +100,11 @@ backend/
 
 ## Deployment
 
-- **Frontend** → Vercel (auto-routes `/api/*` to the backend — see [vercel.json](vercel.json))
-- **Backend** → Render (config in [render.yaml](render.yaml)). Set `ANTHROPIC_API_KEY` and `FRONTEND_URL` in the Render dashboard.
+Both frontend and backend deploy to **Vercel** via `experimentalServices` in [vercel.json](vercel.json):
+- `/` → Next.js frontend
+- `/api` → FastAPI backend
+
+Set `ANTHROPIC_API_KEY` and `FRONTEND_URL` in the Vercel project's environment variable settings.
 
 ## Secrets
 
