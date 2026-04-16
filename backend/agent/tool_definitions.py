@@ -1,4 +1,9 @@
-"""Tool schemas for the Claude API tool-use loop."""
+"""Tool schemas for the Gemini API function-calling loop.
+
+Gemini uses ``parameters`` (OpenAPI/JSON Schema subset) instead of
+Anthropic's ``input_schema``.  Everything else — names, descriptions,
+and property shapes — is identical to the previous Claude definitions.
+"""
 
 TOOL_DEFINITIONS = [
     {
@@ -11,10 +16,9 @@ TOOL_DEFINITIONS = [
             "Original row data is NOT included in the output — only aggregate statistics. "
             "Call this first before any other tool."
         ),
-        "input_schema": {
+        "parameters": {
             "type": "object",
             "properties": {},
-            "required": [],
         },
     },
     {
@@ -30,10 +34,9 @@ TOOL_DEFINITIONS = [
             "For each issue, returns severity (CRITICAL/WARNING/INFO), affected row count, "
             "and a proposed metadata fix. Call this after extract_metadata."
         ),
-        "input_schema": {
+        "parameters": {
             "type": "object",
             "properties": {},
-            "required": [],
         },
     },
     {
@@ -47,7 +50,7 @@ TOOL_DEFINITIONS = [
             "Returns row counts and model selection rationale. "
             "Call this after check_hygiene (with or without applied fixes)."
         ),
-        "input_schema": {
+        "parameters": {
             "type": "object",
             "properties": {
                 "n_rows": {
@@ -56,11 +59,9 @@ TOOL_DEFINITIONS = [
                 },
                 "model": {
                     "type": "string",
-                    "enum": ["auto", "GaussianCopula", "CTGAN"],
-                    "description": "SDV model. 'auto' selects based on distribution complexity.",
+                    "description": "SDV model to use: 'auto', 'GaussianCopula', or 'CTGAN'. 'auto' selects based on distribution complexity.",
                 },
             },
-            "required": [],
         },
     },
     {
@@ -74,10 +75,9 @@ TOOL_DEFINITIONS = [
             "Returns an overall score 0–100 and per-dimension breakdown. "
             "Call this after generate_synthetic."
         ),
-        "input_schema": {
+        "parameters": {
             "type": "object",
             "properties": {},
-            "required": [],
         },
     },
 ]

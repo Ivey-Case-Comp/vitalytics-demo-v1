@@ -1,13 +1,25 @@
 """
-Claude ReAct (Reason + Act) loop.
+Gemini 2.0 Flash ReAct (Reason + Act) loop.
 Emits SSE-ready event dicts as an async generator.
-Uses synchronous messages.create (no streaming) — simpler and reliable for demo.
+
+Provider: google-genai SDK (v1.x — the current, non-deprecated package)
+Model: gemini-2.0-flash
+
+Key differences from the previous Claude implementation:
+  - Tools declared as types.Tool(function_declarations=[...])
+  - History managed by genai.Client chat session
+  - Tool results sent as types.Part.from_function_response parts
+  - No tool_use_id needed — Gemini correlates by function name
+  - response.function_calls / response.text replace Claude's block inspection
 """
+import asyncio
 import json
 import os
 from typing import AsyncGenerator
 
-import anthropic
+from google import genai
+from google.genai import types
+
 import pandas as pd
 
 from agent.personas import SYSTEM_PROMPTS
@@ -17,23 +29,37 @@ from tools.check_hygiene import check_hygiene
 from tools.generate_synthetic import generate_synthetic
 from tools.verify_fidelity import verify_fidelity
 
-_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-_client = anthropic.Anthropic(api_key=_api_key)
+# ── Client init ───────────────────────────────────────────────────────────────
+
+_api_key = os.environ.get("GEMINI_API_KEY", "")
+_client = genai.Client(api_key=_api_key) if _api_key else None
 
 # Demo/mock mode is active when:
 #  • DEMO_MOCK=true env var is set (explicit opt-in), OR
 #  • the API key is missing, clearly a placeholder, or too short to be real.
-# This ensures the app degrades gracefully on Vercel when the env var isn't
-# forwarded to the Python runtime by experimentalServices.
 _DEMO_MODE: bool = (
     os.environ.get("DEMO_MOCK", "").lower() == "true"
     or not _api_key
     or len(_api_key) < 20
     or "placeholder" in _api_key.lower()
-    or _api_key.rstrip(".") == "sk-ant-"
+    or _api_key == "AIza..."
 )
 
-# Pre-baked mock events for demo mode (fallback if API unavailable)
+# Build the tool config once at module load time.
+# google-genai 1.x: wrap all function declarations in a single types.Tool.
+_GEMINI_TOOLS = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name=t["name"],
+            description=t["description"],
+            parameters=t.get("parameters"),
+        )
+        for t in TOOL_DEFINITIONS
+    ]
+)
+
+# ── Pre-baked mock events for demo mode ──────────────────────────────────────
+
 MOCK_EVENTS = {
     "profile": [
         {"type": "reasoning", "content": "Analyzing the dataset schema... I can see 17 columns including demographic, clinical, and administrative data."},
@@ -66,6 +92,8 @@ MOCK_EVENTS = {
 }
 
 
+# ── Tool execution (unchanged logic; defensive int cast for Gemini) ───────────
+
 def _execute_tool(tool_name: str, tool_input: dict, session_state: dict) -> str:
     """Execute a tool synchronously. Returns JSON string result."""
     try:
@@ -93,9 +121,10 @@ def _execute_tool(tool_name: str, tool_input: dict, session_state: dict) -> str:
             session_state["hygiene_issues"] = issues
             critical = [i for i in issues if i["severity"] == "CRITICAL"]
             warnings = [i for i in issues if i["severity"] == "WARNING"]
-            summary = []
-            for issue in issues[:5]:
-                summary.append(f"{issue['severity']}: {issue['description'][:100]}")
+            summary = [
+                f"{issue['severity']}: {issue['description'][:100]}"
+                for issue in issues[:5]
+            ]
             return json.dumps({
                 "total_issues": len(issues),
                 "critical": len(critical),
@@ -107,11 +136,10 @@ def _execute_tool(tool_name: str, tool_input: dict, session_state: dict) -> str:
             meta = session_state.get("metadata")
             if not meta:
                 return json.dumps({"error": "No metadata. Run extract_metadata first."})
-            n_rows = tool_input.get("n_rows", 500)
+            # Defensive cast: Gemini may send numeric args as float
+            n_rows = int(tool_input.get("n_rows", 500))
             model = tool_input.get("model", "auto")
             result = generate_synthetic(meta, n_rows=n_rows, model=model)
-            # Save synthetic data to session
-            import tempfile, os
             from pathlib import Path
             out_dir = Path(__file__).parent.parent / "outputs"
             out_dir.mkdir(exist_ok=True)
@@ -152,6 +180,8 @@ def _execute_tool(tool_name: str, tool_input: dict, session_state: dict) -> str:
         return json.dumps({"error": str(e), "tool": tool_name})
 
 
+# ── Pipeline state summary ────────────────────────────────────────────────────
+
 def _build_state_context(state: dict) -> str:
     parts = []
     if state.get("metadata"):
@@ -161,7 +191,6 @@ def _build_state_context(state: dict) -> str:
         n = len(state["hygiene_issues"])
         crit = sum(1 for i in state["hygiene_issues"] if i.get("severity") == "CRITICAL")
         parts.append(f"Hygiene audit done: {n} issues ({crit} critical)")
-        # Include applied fixes
         applied = state.get("applied_fixes", [])
         if applied:
             parts.append(f"Fixes applied: {len(applied)} hygiene fixes approved by user")
@@ -174,16 +203,19 @@ def _build_state_context(state: dict) -> str:
     return "; ".join(parts) if parts else "Pipeline not started"
 
 
+# ── Main ReAct loop ───────────────────────────────────────────────────────────
+
 async def run_pipeline(
     message: str,
     role: str,
     session_state: dict,
 ) -> AsyncGenerator[dict, None]:
     """
-    Async generator that runs the Claude ReAct loop and yields SSE event dicts.
+    Async generator that runs the Gemini 2.0 Flash ReAct loop and yields
+    SSE event dicts.
     Event types: reasoning, tool_call, tool_result, conclusion, error, done
     """
-    # Demo mode: return pre-baked events (no real API call)
+    # ── Demo mode: return pre-baked events, no API call ──────────────────────
     if _DEMO_MODE:
         step_key = "chat"
         for key in ["profile", "hygiene", "generate", "verify"]:
@@ -195,56 +227,82 @@ async def run_pipeline(
         yield {"type": "done"}
         return
 
+    # ── Live mode ─────────────────────────────────────────────────────────────
     system = SYSTEM_PROMPTS.get(role, SYSTEM_PROMPTS["analyst"])
     context = _build_state_context(session_state)
     full_message = f"{message}\n\n[Pipeline state: {context}]"
 
-    conversation = session_state.get("conversation", [])
-    conversation.append({"role": "user", "content": full_message})
+    # GenerateContentConfig is reused across all turns in this session.
+    config = types.GenerateContentConfig(
+        system_instruction=system,
+        tools=[_GEMINI_TOOLS],
+    )
+
+    # Start or resume the chat session with persisted history.
+    chat = _client.chats.create(
+        model="gemini-2.0-flash",
+        config=config,
+        history=session_state.get("gemini_history", []),
+    )
+
+    # First turn: plain string. Subsequent turns after tool calls: list of
+    # function_response Parts.
+    next_input = full_message
 
     max_iterations = 8
     for _ in range(max_iterations):
         try:
-            response = _client.messages.create(
-                model="claude-opus-4-6",
-                max_tokens=2048,
-                system=system,
-                tools=TOOL_DEFINITIONS,  # type: ignore[arg-type]
-                messages=conversation,
-            )
+            response = await asyncio.to_thread(chat.send_message, next_input)
         except Exception as e:
-            yield {"type": "error", "content": f"Claude API error: {str(e)}"}
+            yield {"type": "error", "content": f"Gemini API error: {str(e)}"}
             yield {"type": "done"}
             return
 
-        tool_blocks = []
-        for block in response.content:
-            if block.type == "text":
-                event_type = "conclusion" if response.stop_reason == "end_turn" else "reasoning"
-                yield {"type": event_type, "content": block.text}
-            elif block.type == "tool_use":
-                yield {"type": "tool_call", "name": block.name, "input": block.input}
-                tool_blocks.append(block)
+        # response.function_calls is a helper list of FunctionCall objects.
+        # response.text is the text of the first candidate (None if no text part).
+        function_calls = response.function_calls or []
+        response_text = response.text or ""
 
-        if response.stop_reason == "end_turn":
-            conversation.append({"role": "assistant", "content": response.content})
-            session_state["conversation"] = conversation
+        # Emit text as reasoning (if more tool calls follow) or conclusion (final).
+        event_type = "reasoning" if function_calls else "conclusion"
+        if response_text:
+            yield {"type": event_type, "content": response_text}
+
+        # No tool calls → model has finished reasoning.
+        if not function_calls:
+            if not response_text:
+                # Safety net: always emit a conclusion so the UI doesn't hang.
+                yield {"type": "conclusion", "content": "Pipeline step complete."}
             break
 
-        if response.stop_reason == "tool_use":
-            conversation.append({"role": "assistant", "content": response.content})
-            tool_results = []
-            for tb in tool_blocks:
-                result_content = _execute_tool(tb.name, tb.input, session_state)  # type: ignore[arg-type]
-                # Emit truncated result for UI
-                try:
-                    parsed = json.loads(result_content)
-                    display = json.dumps(parsed, indent=None)[:400]
-                except Exception:
-                    display = result_content[:400]
-                yield {"type": "tool_result", "name": tb.name, "content": display}
-                tool_results.append({"type": "tool_result", "tool_use_id": tb.id, "content": result_content})
-            conversation.append({"role": "user", "content": tool_results})
+        # Execute tools and build function_response parts for the next turn.
+        function_response_parts = []
+        for fc in function_calls:
+            tool_name = fc.name
+            tool_args = dict(fc.args) if fc.args else {}
 
-    session_state["conversation"] = conversation
+            yield {"type": "tool_call", "name": tool_name, "input": tool_args}
+
+            result_json = _execute_tool(tool_name, tool_args, session_state)
+            try:
+                parsed = json.loads(result_json)
+                display = json.dumps(parsed)[:400]
+            except Exception:
+                parsed = {"result": result_json}
+                display = result_json[:400]
+
+            yield {"type": "tool_result", "name": tool_name, "content": display}
+
+            # google-genai 1.x: wrap result in a Part with function_response.
+            function_response_parts.append(
+                types.Part.from_function_response(
+                    name=tool_name,
+                    response={"result": parsed},
+                )
+            )
+
+        next_input = function_response_parts
+
+    # Persist updated history for multi-turn chat continuity within the session.
+    session_state["gemini_history"] = chat.history
     yield {"type": "done"}

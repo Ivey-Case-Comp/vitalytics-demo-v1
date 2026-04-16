@@ -78,7 +78,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "model": "claude-opus-4-6"}
+    return {"status": "ok", "model": "gemini-2.0-flash"}
 
 
 # ─── Session ─────────────────────────────────────────────────────────────────
