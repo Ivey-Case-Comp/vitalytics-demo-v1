@@ -254,7 +254,26 @@ async def run_pipeline(
         try:
             response = await asyncio.to_thread(chat.send_message, next_input)
         except Exception as e:
-            yield {"type": "error", "content": f"Gemini API error: {str(e)}"}
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                # Daily free-tier quota exhausted — degrade gracefully to mock events.
+                step_key = "chat"
+                for key in ["profile", "hygiene", "generate", "verify"]:
+                    if key in message.lower():
+                        step_key = key
+                        break
+                yield {
+                    "type": "reasoning",
+                    "content": (
+                        "Gemini API rate limit reached (free-tier quota exhausted). "
+                        "Showing pre-written demo response. Upgrade your quota at "
+                        "ai.google.dev/gemini-api/docs/rate-limits for live AI analysis."
+                    ),
+                }
+                for event in MOCK_EVENTS.get(step_key, MOCK_EVENTS["chat"]):
+                    yield event
+            else:
+                yield {"type": "error", "content": f"Gemini API error: {err_str}"}
             yield {"type": "done"}
             return
 
