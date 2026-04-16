@@ -14,16 +14,21 @@ export default function UploadStep() {
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const creatingRef = useRef(false)
 
-  // Create session on mount if not yet created
+  // Create session on mount — guard with ref so React StrictMode's
+  // double-invocation doesn't create two sessions in the same backend.
   useEffect(() => {
-    if (!state.sessionId) {
-      createSession().then(({ session_id }) => {
+    if (state.sessionId || creatingRef.current) return
+    creatingRef.current = true
+    createSession()
+      .then(({ session_id }) => {
         dispatch({ type: "SET_SESSION_ID", sessionId: session_id })
-      }).catch(() => {
+      })
+      .catch(() => {
+        creatingRef.current = false
         setError("Cannot connect to backend. Make sure FastAPI is running on port 8000.")
       })
-    }
   }, [state.sessionId, dispatch])
 
   async function handleLoadDemo() {

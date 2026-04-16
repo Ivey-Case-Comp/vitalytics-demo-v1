@@ -19,10 +19,14 @@ export default function VerifyStep() {
   const persona = PERSONAS.find((p) => p.key === role)
   const [loading, setLoading] = useState(false)
   const [selectedCol, setSelectedCol] = useState<string>("")
+  const [error, setError] = useState<string | null>(null)
+  const verifyingRef = useRef(false)
 
-  useEffect(() => {
-    if (!sessionId || fidelityReport !== null) return
+  function doVerify() {
+    if (!sessionId || verifyingRef.current) return
+    verifyingRef.current = true
     setLoading(true)
+    setError(null)
     runVerification(sessionId)
       .then(({ fidelity }) => {
         dispatch({ type: "SET_FIDELITY", report: fidelity })
@@ -30,9 +34,18 @@ export default function VerifyStep() {
           setSelectedCol(fidelity.column_scores[0].column)
         }
       })
-      .catch(console.error)
+      .catch((e: Error) => {
+        setError(e.message)
+        verifyingRef.current = false
+      })
       .finally(() => setLoading(false))
-  }, [sessionId, fidelityReport, dispatch])
+  }
+
+  useEffect(() => {
+    if (!sessionId || fidelityReport !== null) return
+    doVerify()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, fidelityReport])
 
   useEffect(() => {
     if (fidelityReport && !selectedCol && fidelityReport.column_scores.length > 0) {
@@ -55,6 +68,18 @@ export default function VerifyStep() {
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Running fidelity verification…
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <p className="text-sm text-destructive font-medium">Verification failed: {error}</p>
+          <button
+            onClick={doVerify}
+            className="text-xs text-primary underline underline-offset-2 hover:no-underline"
+          >
+            Retry
+          </button>
         </div>
       )}
 
