@@ -15,34 +15,37 @@ export default function GenerateStep() {
   const { state, dispatch } = usePipeline()
   const { sessionId, generationStatus, generationProgress, generationResult, role } = state
   const persona = PERSONAS.find((p) => p.key === role)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const startedRef = useRef(false)
+  const genStartedRef = useRef(false)
   const dispatchedMsgCount = useRef(0)
   const [progressPct, setProgressPct] = useState(0)
 
   useEffect(() => {
-    if (!sessionId || startedRef.current) return
-    startedRef.current = true
+    if (!sessionId) return
 
-    dispatch({ type: "SET_GEN_STATUS", status: "generating" })
-    dispatch({ type: "ADD_GEN_PROGRESS", message: "Initialising generation engine…" })
+    // Guard startGeneration with a ref so it fires only once even under
+    // React StrictMode (which double-invokes effects in dev mode).
+    if (!genStartedRef.current) {
+      genStartedRef.current = true
+      dispatch({ type: "SET_GEN_STATUS", status: "generating" })
+      dispatch({ type: "ADD_GEN_PROGRESS", message: "Initialising generation engine…" })
+      startGeneration(sessionId).catch((e) => {
+        console.error(e)
+        dispatch({ type: "SET_GEN_STATUS", status: "error" })
+      })
+    }
 
-    startGeneration(sessionId).catch((e) => {
-      console.error(e)
-      dispatch({ type: "SET_GEN_STATUS", status: "error" })
-    })
-
-    pollRef.current = setInterval(async () => {
+    // Poll is NOT guarded — it must restart on every effect invocation so
+    // that StrictMode's cleanup+remount cycle ends with a live poll.
+    const interval = setInterval(async () => {
       try {
         const data = await pollGenerationStatus(sessionId)
-        // Only dispatch messages we haven't seen yet
         const newMsgs = data.progress.slice(dispatchedMsgCount.current)
         for (const msg of newMsgs) {
           dispatch({ type: "ADD_GEN_PROGRESS", message: msg })
           dispatchedMsgCount.current++
         }
         if (data.status === "generated") {
-          if (pollRef.current) clearInterval(pollRef.current)
+          clearInterval(interval)
           if (data.result) {
             dispatch({
               type: "SET_GEN_RESULT",
@@ -51,17 +54,15 @@ export default function GenerateStep() {
           }
           dispatch({ type: "SET_GEN_STATUS", status: "done" })
         } else if (data.status === "error") {
+          clearInterval(interval)
           dispatch({ type: "SET_GEN_STATUS", status: "error" })
-          if (pollRef.current) clearInterval(pollRef.current)
         }
       } catch (e) {
         console.error(e)
       }
     }, 2000)
 
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
+    return () => clearInterval(interval)
   }, [sessionId, dispatch])
 
   // Animate progress bar while generating
