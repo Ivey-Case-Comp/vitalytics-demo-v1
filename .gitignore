@@ -38,6 +38,12 @@ yarn-error.log*
 backend/uploads/
 backend/outputs/
 
+# Python virtual environment & caches — installed locally, never committed.
+# Vercel installs dependencies from backend/requirements.txt on its own.
+backend/venv/
+**/__pycache__/
+*.pyc
+
 # vercel
 .vercel
 
