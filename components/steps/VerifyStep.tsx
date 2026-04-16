@@ -94,7 +94,7 @@ export default function VerifyStep() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Privacy Audit</CardTitle>
               </CardHeader>
-              <CardContent className="flex justify-center">
+              <CardContent className="flex justify-center px-3">
                 <MiaGauge auc={fidelityReport.mia_auc} />
               </CardContent>
             </Card>

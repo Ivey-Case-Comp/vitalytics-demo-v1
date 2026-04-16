@@ -29,9 +29,9 @@ export default function MiaGauge({ auc }: MiaGaugeProps) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 w-full">
       <span className="text-sm font-medium text-foreground">MIA AUC Score</span>
-      <svg viewBox="0 0 200 120" width="200" height="120" aria-label={`MIA AUC: ${auc.toFixed(2)}`}>
+      <svg viewBox="0 0 200 120" width="100%" style={{ maxWidth: 220 }} aria-label={`MIA AUC: ${auc.toFixed(2)}`}>
         {/* Background arc (gray) */}
         <path
           d="M 24 100 A 76 76 0 0 1 176 100"
@@ -87,7 +87,7 @@ export default function MiaGauge({ auc }: MiaGaugeProps) {
         </span>
         <span className="text-xs text-muted-foreground">0.5 = indistinguishable from real</span>
       </div>
-      <div className="flex gap-3 text-xs text-muted-foreground">
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded bg-green-300" /> 0.50–0.55</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded bg-amber-200" /> 0.55–0.65</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded bg-red-300" /> &gt;0.65</span>
