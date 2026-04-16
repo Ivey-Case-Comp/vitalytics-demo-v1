@@ -1,8 +1,14 @@
+import sys
 import uuid
 import asyncio
 import json
 import os
 from pathlib import Path
+
+# Ensure backend/ is on sys.path so that `from tools.x import ...` and
+# `from agent.x import ...` resolve correctly both locally (uvicorn run from
+# inside backend/) and on Vercel (working directory is the project root).
+sys.path.insert(0, str(Path(__file__).parent))
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
