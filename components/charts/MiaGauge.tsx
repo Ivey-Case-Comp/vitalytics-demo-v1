@@ -31,7 +31,7 @@ export default function MiaGauge({ auc }: MiaGaugeProps) {
   return (
     <div className="flex flex-col items-center gap-2 w-full">
       <span className="text-sm font-medium text-foreground">MIA AUC Score</span>
-      <svg viewBox="0 0 200 120" width="100%" style={{ maxWidth: 220 }} aria-label={`MIA AUC: ${auc.toFixed(2)}`}>
+      <svg viewBox="0 0 200 150" width="100%" style={{ maxWidth: 220 }} aria-label={`MIA AUC: ${auc.toFixed(2)}`}>
         {/* Background arc (gray) */}
         <path
           d="M 24 100 A 76 76 0 0 1 176 100"
@@ -76,8 +76,8 @@ export default function MiaGauge({ auc }: MiaGaugeProps) {
         />
         {/* Center dot */}
         <circle cx={cx} cy={cy} r="5" fill={statusColor} />
-        {/* AUC value */}
-        <text x={cx} y={cy + 22} textAnchor="middle" fontSize="18" fontWeight="bold" fill="currentColor">
+        {/* AUC value — sits below the needle/dot with breathing room */}
+        <text x={cx} y={cy + 40} textAnchor="middle" fontSize="20" fontWeight="bold" fill="currentColor">
           {auc.toFixed(2)}
         </text>
       </svg>
