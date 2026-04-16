@@ -35,14 +35,21 @@ pip install -r requirements.txt
 
 ### 3. Configure environment variables
 
-Create `backend/.env`:
+Copy the example file and edit it:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...   # get your own at https://console.anthropic.com
-FRONTEND_URL=http://localhost:3000
+cp backend/.env.example backend/.env
 ```
 
-> **No API key yet?** Set `DEMO_MOCK=true` in `backend/.env` instead — the agent returns canned responses so you can run the full app end-to-end without a key. See [backend/agent/react_loop.py:173](backend/agent/react_loop.py:173).
+The three required variables:
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | Claude API key from [console.anthropic.com](https://console.anthropic.com) | *(required unless DEMO_MOCK=true)* |
+| `FRONTEND_URL` | Next.js origin — used for CORS allow-list | `http://localhost:3000` |
+| `DEMO_MOCK` | Set `true` to skip the API and use pre-baked agent responses | `false` |
+
+> **No API key yet?** Set `DEMO_MOCK=true` — the full 5-step pipeline (Upload → Profile → Hygiene → Generate → Verify) runs end-to-end using pre-baked agent responses. Real data processing (pandas / scikit-learn) still executes; only the AI commentary is mocked. See [backend/agent/react_loop.py:173](backend/agent/react_loop.py:173).
 >
 > **Note:** Claude Pro (the chat subscription) does not include API access. API keys are billed separately via the Anthropic Console.
 
@@ -80,8 +87,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Symptom | Fix |
 | --- | --- |
-| CORS error in browser console | Confirm `FRONTEND_URL` in `backend/.env` matches the Next.js origin |
-| `anthropic.AuthenticationError` | API key missing or invalid — set `DEMO_MOCK=true` to unblock |
+| "Cannot connect to backend" on `/pipeline` | FastAPI isn't running — start it: `cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000` |
+| Load Demo button disabled / greyed out | Caused by the session not being created (backend not running). Start the backend first. |
+| CORS error in browser console | `FRONTEND_URL` missing or wrong in `backend/.env` — must match the Next.js origin exactly (e.g. `http://localhost:3000`) |
+| `anthropic.AuthenticationError` | API key missing or invalid — set `DEMO_MOCK=true` in `backend/.env` to unblock |
 | Port 8000 already in use | Run `uvicorn main:app --reload --port 8001` and set `NEXT_PUBLIC_API_URL=http://localhost:8001` in `.env.local` |
 | `ModuleNotFoundError` on backend start | Make sure the venv is activated (`source backend/venv/bin/activate`) |
 

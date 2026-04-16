@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — .env.example is safe to commit; everything else stays local
 .env*
+!.env.example
+
+# backend generated data (uploads and synthetic outputs are runtime artefacts)
+backend/uploads/
+backend/outputs/
 
 # vercel
 .vercel
