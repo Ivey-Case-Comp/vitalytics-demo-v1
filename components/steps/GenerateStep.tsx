@@ -17,6 +17,7 @@ export default function GenerateStep() {
   const persona = PERSONAS.find((p) => p.key === role)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startedRef = useRef(false)
+  const dispatchedMsgCount = useRef(0)
   const [progressPct, setProgressPct] = useState(0)
 
   useEffect(() => {
@@ -34,16 +35,21 @@ export default function GenerateStep() {
     pollRef.current = setInterval(async () => {
       try {
         const data = await pollGenerationStatus(sessionId)
-        for (const msg of data.progress) {
+        // Only dispatch messages we haven't seen yet
+        const newMsgs = data.progress.slice(dispatchedMsgCount.current)
+        for (const msg of newMsgs) {
           dispatch({ type: "ADD_GEN_PROGRESS", message: msg })
+          dispatchedMsgCount.current++
         }
-        if (data.status === "generated" && data.result) {
-          dispatch({ type: "SET_GEN_STATUS", status: "done" })
-          dispatch({
-            type: "SET_GEN_RESULT",
-            result: { rows_generated: data.result.rows_generated, model_used: data.result.model_used },
-          })
+        if (data.status === "generated") {
           if (pollRef.current) clearInterval(pollRef.current)
+          if (data.result) {
+            dispatch({
+              type: "SET_GEN_RESULT",
+              result: { rows_generated: data.result.rows_generated, model_used: data.result.model_used },
+            })
+          }
+          dispatch({ type: "SET_GEN_STATUS", status: "done" })
         } else if (data.status === "error") {
           dispatch({ type: "SET_GEN_STATUS", status: "error" })
           if (pollRef.current) clearInterval(pollRef.current)

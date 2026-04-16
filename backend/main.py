@@ -211,7 +211,7 @@ async def _run_generation(session_id: str, meta: dict, n_rows: int, model: str):
     def progress(msg: str):
         jobs[session_id]["generation_progress"].append(msg)
     try:
-        result = await asyncio.get_event_loop().run_in_executor(
+        result = await asyncio.get_running_loop().run_in_executor(
             None, lambda: generate_synthetic(meta, n_rows=n_rows, model=model, progress_callback=progress)
         )
         output_path = OUTPUT_DIR / f"{session_id}_synthetic.csv"
@@ -253,7 +253,7 @@ async def run_verification(session_id: str):
     if not real_path or not synth_path:
         raise HTTPException(400, "Need both real and synthetic data. Generate first.")
     try:
-        result = await asyncio.get_event_loop().run_in_executor(
+        result = await asyncio.get_running_loop().run_in_executor(
             None, lambda: verify_fidelity(real_path, synth_path)
         )
         jobs[session_id]["fidelity"] = result
