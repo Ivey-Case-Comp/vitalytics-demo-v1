@@ -17,9 +17,23 @@ from tools.check_hygiene import check_hygiene
 from tools.generate_synthetic import generate_synthetic
 from tools.verify_fidelity import verify_fidelity
 
-_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+_client = anthropic.Anthropic(api_key=_api_key)
 
-# Pre-baked mock events for DEMO_MOCK=true mode (fallback if API unavailable)
+# Demo/mock mode is active when:
+#  • DEMO_MOCK=true env var is set (explicit opt-in), OR
+#  • the API key is missing, clearly a placeholder, or too short to be real.
+# This ensures the app degrades gracefully on Vercel when the env var isn't
+# forwarded to the Python runtime by experimentalServices.
+_DEMO_MODE: bool = (
+    os.environ.get("DEMO_MOCK", "").lower() == "true"
+    or not _api_key
+    or len(_api_key) < 20
+    or "placeholder" in _api_key.lower()
+    or _api_key.rstrip(".") == "sk-ant-"
+)
+
+# Pre-baked mock events for demo mode (fallback if API unavailable)
 MOCK_EVENTS = {
     "profile": [
         {"type": "reasoning", "content": "Analyzing the dataset schema... I can see 17 columns including demographic, clinical, and administrative data."},
@@ -169,8 +183,8 @@ async def run_pipeline(
     Async generator that runs the Claude ReAct loop and yields SSE event dicts.
     Event types: reasoning, tool_call, tool_result, conclusion, error, done
     """
-    # Mock mode: return pre-baked events if DEMO_MOCK=true
-    if os.environ.get("DEMO_MOCK", "").lower() == "true":
+    # Demo mode: return pre-baked events (no real API call)
+    if _DEMO_MODE:
         step_key = "chat"
         for key in ["profile", "hygiene", "generate", "verify"]:
             if key in message.lower():

@@ -47,8 +47,12 @@ jobs: dict[str, dict] = {}
 
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data" / "synthea"
-UPLOAD_DIR = BASE_DIR / "uploads"
-OUTPUT_DIR = BASE_DIR / "outputs"
+
+# Vercel's deployment bundle at /var/task is read-only; only /tmp is writable.
+# Locally (no VERCEL env var) keep files next to the backend directory.
+_on_vercel = bool(os.environ.get("VERCEL"))
+UPLOAD_DIR = Path("/tmp/vitalytics_uploads") if _on_vercel else BASE_DIR / "uploads"
+OUTPUT_DIR = Path("/tmp/vitalytics_outputs") if _on_vercel else BASE_DIR / "outputs"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
