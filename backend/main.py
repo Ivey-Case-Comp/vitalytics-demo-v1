@@ -79,7 +79,7 @@ async def health():
 
 # ─── Session ─────────────────────────────────────────────────────────────────
 
-@app.post("/api/session")
+@app.post("/session")
 async def create_session():
     sid = str(uuid.uuid4())
     jobs[sid] = {
@@ -102,7 +102,7 @@ async def create_session():
 
 # ─── Upload ───────────────────────────────────────────────────────────────────
 
-@app.post("/api/upload/{session_id}")
+@app.post("/upload/{session_id}")
 async def upload_file(session_id: str, file: UploadFile = File(...)):
     _ensure_session(session_id)
     file_path = UPLOAD_DIR / f"{session_id}_{file.filename}"
@@ -130,7 +130,7 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
         raise HTTPException(500, f"Metadata extraction failed: {str(e)}")
 
 
-@app.post("/api/load-demo/{session_id}")
+@app.post("/load-demo/{session_id}")
 async def load_demo(session_id: str):
     _ensure_session(session_id)
     demo_path = DATA_DIR / "patients.csv"
@@ -159,7 +159,7 @@ async def load_demo(session_id: str):
 
 # ─── Hygiene ─────────────────────────────────────────────────────────────────
 
-@app.get("/api/hygiene/{session_id}")
+@app.get("/hygiene/{session_id}")
 async def run_hygiene(session_id: str):
     _ensure_session(session_id)
     meta = jobs[session_id].get("metadata")
@@ -171,7 +171,7 @@ async def run_hygiene(session_id: str):
     return {"session_id": session_id, "issues": issues}
 
 
-@app.post("/api/hygiene/apply/{session_id}")
+@app.post("/hygiene/apply/{session_id}")
 async def apply_hygiene_fixes(session_id: str, req: HygieneApprovalRequest):
     _ensure_session(session_id)
     issues = jobs[session_id].get("hygiene_issues") or []
@@ -191,7 +191,7 @@ async def apply_hygiene_fixes(session_id: str, req: HygieneApprovalRequest):
 
 # ─── Generation ──────────────────────────────────────────────────────────────
 
-@app.post("/api/generate/{session_id}")
+@app.post("/generate/{session_id}")
 async def start_generation(session_id: str, req: GenerateRequest, background_tasks: BackgroundTasks):
     _ensure_session(session_id)
     meta = jobs[session_id].get("metadata")
@@ -227,7 +227,7 @@ async def _run_generation(session_id: str, meta: dict, n_rows: int, model: str):
         jobs[session_id]["generation_progress"].append(f"Error: {str(e)}")
 
 
-@app.get("/api/generate/status/{session_id}")
+@app.get("/generate/status/{session_id}")
 async def generation_status(session_id: str):
     _ensure_session(session_id)
     job = jobs[session_id]
@@ -241,7 +241,7 @@ async def generation_status(session_id: str):
 
 # ─── Verification ─────────────────────────────────────────────────────────────
 
-@app.get("/api/verify/{session_id}")
+@app.get("/verify/{session_id}")
 async def run_verification(session_id: str):
     _ensure_session(session_id)
     real_path = jobs[session_id].get("real_path")
@@ -261,7 +261,7 @@ async def run_verification(session_id: str):
 
 # ─── Preview / Download ───────────────────────────────────────────────────────
 
-@app.get("/api/preview/{session_id}")
+@app.get("/preview/{session_id}")
 async def get_preview(session_id: str, n: int = 20):
     _ensure_session(session_id)
     path = jobs[session_id].get("synthetic_path")
@@ -271,7 +271,7 @@ async def get_preview(session_id: str, n: int = 20):
     return {"columns": list(df.columns), "rows": df.fillna("").to_dict(orient="records")}
 
 
-@app.get("/api/download/{session_id}")
+@app.get("/download/{session_id}")
 async def download_synthetic(session_id: str):
     _ensure_session(session_id)
     path = jobs[session_id].get("synthetic_path")
@@ -282,7 +282,7 @@ async def download_synthetic(session_id: str):
 
 # ─── Agent Chat Stream (SSE) ──────────────────────────────────────────────────
 
-@app.post("/api/chat/stream")
+@app.post("/chat/stream")
 async def chat_stream(req: ChatRequest):
     _ensure_session(req.session_id)
     job = jobs[req.session_id]
@@ -317,7 +317,7 @@ async def chat_stream(req: ChatRequest):
 
 # ─── Jobs status ─────────────────────────────────────────────────────────────
 
-@app.get("/api/jobs/{session_id}")
+@app.get("/jobs/{session_id}")
 async def get_job(session_id: str):
     _ensure_session(session_id)
     job = {k: v for k, v in jobs[session_id].items() if k != "conversation"}
