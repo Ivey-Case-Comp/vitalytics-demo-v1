@@ -145,12 +145,12 @@ export default function VerifyStep() {
                   <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 )}
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-sm text-foreground">Fidelity Report</p>
                   <span
                     className={cn(
-                      "text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border",
+                      "text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border whitespace-nowrap",
                       passed
                         ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/70 dark:border-emerald-900/50"
                         : "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200/70 dark:border-amber-900/50"
