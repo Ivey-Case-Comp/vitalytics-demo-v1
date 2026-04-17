@@ -45,7 +45,12 @@ export default function PipelinePage() {
       {/* Role selector bar */}
       {currentStep > 1 && (
         <div className="flex-shrink-0 border-b bg-muted/30 px-4 py-2">
-          <div className="max-w-screen-xl mx-auto">
+          <div className="max-w-screen-xl mx-auto flex items-center gap-4">
+            <div className="flex-shrink-0 hidden sm:block">
+              <p className="text-xs font-semibold text-foreground leading-tight">Agent view</p>
+              <p className="text-xs text-muted-foreground leading-tight mt-0.5">AI commentary adapts to your role</p>
+            </div>
+            <div className="hidden sm:block w-px h-8 bg-border flex-shrink-0" />
             <RoleSelector
               currentRole={role}
               onSelect={(r) => dispatch({ type: "SET_ROLE", role: r })}

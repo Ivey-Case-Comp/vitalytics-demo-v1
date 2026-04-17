@@ -88,21 +88,27 @@ export default function VerifyStep() {
           {/* Pass / fail banner */}
           <div
             className={cn(
-              "flex items-center justify-between rounded-lg border px-4 py-3",
-              passed
-                ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
-                : "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800"
+              "flex items-center justify-between rounded-lg border border-border border-l-4 bg-card px-4 py-3",
+              passed ? "border-l-green-500" : "border-l-amber-400"
             )}
           >
-            <div className="flex items-center gap-2">
-              {passed ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-              ) : (
-                <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
-              )}
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full",
+                passed ? "bg-green-100 dark:bg-green-900/40" : "bg-amber-100 dark:bg-amber-900/40"
+              )}>
+                {passed ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                )}
+              </div>
               <div>
-                <p className={cn("font-semibold text-sm", passed ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300")}>
-                  Fidelity Report &mdash; {passed ? "Ready to export" : "Review recommended"}
+                <p className="font-semibold text-sm text-foreground">
+                  Fidelity Report &mdash;{" "}
+                  <span className={passed ? "text-green-600" : "text-amber-500"}>
+                    {passed ? "Ready to export" : "Review recommended"}
+                  </span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {passed
@@ -111,18 +117,15 @@ export default function VerifyStep() {
                 </p>
               </div>
             </div>
-            <span
-              className={cn(
-                "text-lg font-bold tabular-nums flex-shrink-0",
-                fidelityReport.overall_score >= 80
-                  ? "text-green-700 dark:text-green-400"
-                  : fidelityReport.overall_score >= 60
-                  ? "text-amber-600"
-                  : "text-red-600"
-              )}
-            >
-              {fidelityReport.overall_score.toFixed(1)}<span className="text-sm font-normal text-muted-foreground">/100</span>
-            </span>
+            <div className="flex flex-col items-end flex-shrink-0 ml-4">
+              <span className={cn(
+                "text-2xl font-bold tabular-nums",
+                fidelityReport.overall_score >= 80 ? "text-green-600" : fidelityReport.overall_score >= 60 ? "text-amber-500" : "text-destructive"
+              )}>
+                {fidelityReport.overall_score.toFixed(1)}
+              </span>
+              <span className="text-xs text-muted-foreground leading-none">/100</span>
+            </div>
           </div>
 
           {/* Metric cards */}

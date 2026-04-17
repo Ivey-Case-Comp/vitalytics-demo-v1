@@ -7,6 +7,7 @@ import pandas as pd
 from scipy import stats
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import StandardScaler
 
 
@@ -68,6 +69,71 @@ def _mia_auc(real_df: pd.DataFrame, synth_df: pd.DataFrame, numeric_cols: list[s
         return 0.5
 
 
+def _tstr_ratio(
+    real_df: pd.DataFrame,
+    synth_df: pd.DataFrame,
+    numeric_cols: list[str],
+    categorical_cols: list[str],
+) -> float:
+    """Train-on-Synthetic Test-on-Real: ratio of synthetic-trained accuracy to real cross-val accuracy.
+    Uses the first suitable categorical column as the prediction target.
+    Returns a value in [0, 1] — closer to 1.0 means synthetic generalises as well as real data.
+    """
+    try:
+        if not numeric_cols:
+            return 1.0
+
+        # Find a suitable target: categorical, 2–10 classes, enough real rows
+        target_col = None
+        for col in categorical_cols:
+            if col in real_df.columns and col in synth_df.columns:
+                n_classes = real_df[col].nunique()
+                if 2 <= n_classes <= 10 and real_df[col].notna().sum() >= 20:
+                    target_col = col
+                    break
+
+        if target_col is None:
+            return 1.0
+
+        feature_cols = [c for c in numeric_cols if c in synth_df.columns]
+        if not feature_cols:
+            return 1.0
+
+        real_mask = real_df[target_col].notna()
+        synth_mask = synth_df[target_col].notna()
+        real_X = real_df.loc[real_mask, feature_cols].fillna(0).astype(float)
+        real_y = real_df.loc[real_mask, target_col].astype(str)
+        synth_X = synth_df.loc[synth_mask, feature_cols].fillna(0).astype(float)
+        synth_y = synth_df.loc[synth_mask, target_col].astype(str)
+
+        if len(real_X) < 10 or len(synth_X) < 10:
+            return 1.0
+
+        scaler = StandardScaler()
+        real_X_scaled = scaler.fit_transform(real_X)
+        synth_X_scaled = scaler.transform(synth_X)
+
+        # Baseline: cross-val accuracy trained+tested on real data
+        clf_real = LogisticRegression(max_iter=300, random_state=42)
+        cv_folds = min(5, len(real_X) // 4)
+        if cv_folds < 2:
+            return 1.0
+        real_cv_acc = float(cross_val_score(clf_real, real_X_scaled, real_y, cv=cv_folds, scoring="accuracy").mean())
+
+        if real_cv_acc < 0.05:
+            return 1.0
+
+        # TSTR: train on synthetic, test on real
+        clf_synth = LogisticRegression(max_iter=300, random_state=42)
+        clf_synth.fit(synth_X_scaled, synth_y)
+        tstr_acc = float(clf_synth.score(real_X_scaled, real_y))
+
+        return round(min(tstr_acc / real_cv_acc, 1.0), 4)
+
+    except Exception:
+        return 1.0
+
+
 def verify_fidelity(real_path: str, synthetic_path: str) -> dict:
     """Compare real vs synthetic data. Returns FidelityReport dict."""
     real_df = pd.read_csv(real_path)
@@ -106,6 +172,9 @@ def verify_fidelity(real_path: str, synthetic_path: str) -> dict:
     # MIA privacy score
     mia_auc = _mia_auc(real_df, synth_df, numeric_cols)
 
+    # TSTR: train on synthetic, test on real
+    tstr_ratio = _tstr_ratio(real_df, synth_df, numeric_cols, categorical_cols)
+
     # Overall score: 60% distribution + 40% correlation
     overall = round(0.6 * distribution_fidelity + 0.4 * corr_fidelity, 1)
 
@@ -114,7 +183,7 @@ def verify_fidelity(real_path: str, synthetic_path: str) -> dict:
         "distribution_fidelity": distribution_fidelity,
         "correlation_fidelity": corr_fidelity,
         "mia_auc": mia_auc,
-        "tstr_ratio": 0.93,
+        "tstr_ratio": tstr_ratio,
         "column_scores": column_scores,
         "correlation_real": corr_real_matrix,
         "correlation_synthetic": corr_synth_matrix,
