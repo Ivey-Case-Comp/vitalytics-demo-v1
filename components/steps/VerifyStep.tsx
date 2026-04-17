@@ -119,68 +119,82 @@ export default function VerifyStep() {
       {fidelityReport && (
         <>
           {/* Pass / fail banner */}
-          <div className="relative overflow-hidden rounded-xl border bg-card">
+          <div
+            className={cn(
+              "relative overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-card",
+              passed
+                ? "from-emerald-50/60 dark:from-emerald-950/20"
+                : "from-amber-50/60 dark:from-amber-950/20"
+            )}
+          >
             <div
               className={cn(
-                "absolute inset-y-0 left-0 w-1",
+                "absolute inset-y-0 left-0 w-1.5",
                 passed ? "bg-emerald-400" : "bg-amber-400"
               )}
             />
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 pl-6 pr-5 py-4">
-              <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8 pl-7 pr-6 py-6">
+              {/* Left: icon + title + description */}
+              <div className="flex items-start gap-4 flex-1 min-w-0">
                 <div
                   className={cn(
-                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border",
+                    "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border",
                     passed
                       ? "bg-emerald-50 border-emerald-200/70 dark:bg-emerald-950/40 dark:border-emerald-900/50"
                       : "bg-amber-50 border-amber-200/70 dark:bg-amber-950/40 dark:border-amber-900/50"
                   )}
                 >
                   {passed ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                   ) : (
-                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-sm text-foreground">Fidelity Report</p>
+                    <h3 className="font-bold text-base text-foreground tracking-tight">
+                      Fidelity Report
+                    </h3>
                     <span
                       className={cn(
                         "text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border whitespace-nowrap",
                         passed
-                          ? "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/70 dark:border-emerald-900/50"
-                          : "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200/70 dark:border-amber-900/50"
+                          ? "text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/60 border-emerald-300/60 dark:border-emerald-900/50"
+                          : "text-amber-700 dark:text-amber-400 bg-amber-100/80 dark:bg-amber-950/60 border-amber-300/60 dark:border-amber-900/50"
                       )}
                     >
                       {passed ? "Ready to export" : "Review recommended"}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     {passed
                       ? "All scores within acceptable thresholds. Dataset is cleared for use."
                       : "One or more metrics are below recommended thresholds. Review agent commentary before use."}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0 sm:border-l sm:pl-6">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
-                  Overall
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span
-                    className={cn(
-                      "text-4xl font-bold tabular-nums leading-none",
-                      fidelityReport.overall_score >= 80
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : fidelityReport.overall_score >= 60
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-destructive"
-                    )}
-                  >
-                    {fidelityReport.overall_score.toFixed(1)}
-                  </span>
-                  <span className="text-base text-muted-foreground font-medium">/100</span>
+
+              {/* Right: big score */}
+              <div className="flex items-center gap-5 flex-shrink-0 md:border-l md:pl-8">
+                <div>
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                    Overall
+                  </div>
+                  <div className="flex items-baseline gap-1.5 mt-1">
+                    <span
+                      className={cn(
+                        "text-5xl font-bold tabular-nums leading-none",
+                        fidelityReport.overall_score >= 80
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : fidelityReport.overall_score >= 60
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-destructive"
+                      )}
+                    >
+                      {fidelityReport.overall_score.toFixed(1)}
+                    </span>
+                    <span className="text-lg text-muted-foreground font-medium">/100</span>
+                  </div>
                 </div>
               </div>
             </div>
