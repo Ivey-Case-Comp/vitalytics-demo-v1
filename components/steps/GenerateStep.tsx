@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { CheckCircle2, Zap, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { CheckCircle2, Zap, Loader2, Sparkles, ArrowRight, AlertCircle, Brain } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -90,29 +89,55 @@ export default function GenerateStep() {
     : `Generating synthetic patient data for a ${persona?.label}. Please explain the generation process, what model is being used, and how the metadata-sampling approach protects patient privacy.`
 
   return (
-    <div className="flex-1 flex flex-col p-6 gap-6 overflow-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="flex-1 flex flex-col p-4 sm:p-6 gap-4 overflow-auto">
+      {/* Step header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-[10px] font-semibold px-2 py-0.5 rounded-full border border-primary/20 uppercase tracking-widest mb-1.5">
+            <Sparkles className="h-2.5 w-2.5" />
+            Step 04 · Generate
+          </div>
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">
+            Synthesising Patient Population
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Sampling from distributions and dependencies. No real rows are ever consulted.
+          </p>
+        </div>
+        {generationStatus === "generating" && (
+          <div className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs text-primary font-semibold">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Running
+          </div>
+        )}
+        {generationStatus === "done" && (
+          <Badge variant="success" className="gap-1 h-7 px-2.5">
+            <CheckCircle2 className="h-3 w-3" /> Complete
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left: Generation progress */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Synthetic Data Generation</h3>
-            {generationStatus === "generating" && (
-              <div className="flex items-center gap-1.5">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground">Running…</span>
+          {/* Progress bar with animated fill */}
+          <div className="rounded-xl border bg-card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Brain className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Generation progress</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Multi-stage sampling pipeline
+                  </div>
+                </div>
               </div>
-            )}
-            {generationStatus === "done" && (
-              <Badge variant="success" className="gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Complete
-              </Badge>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Progress</span>
-              <span>{Math.round(progressPct)}%</span>
+              <div className="text-2xl font-bold text-foreground tabular-nums">
+                {Math.round(progressPct)}
+                <span className="text-sm text-muted-foreground font-normal">%</span>
+              </div>
             </div>
             <Progress value={progressPct} className="h-2" />
           </div>
@@ -120,18 +145,26 @@ export default function GenerateStep() {
           {/* Progress log */}
           <Card>
             <CardContent className="pt-4 pb-4">
-              <div className="space-y-1.5 max-h-48 overflow-y-auto font-mono text-xs">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                  Event log
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">
+                  {generationProgress.length} events
+                </div>
+              </div>
+              <div className="space-y-1 max-h-56 overflow-y-auto font-mono text-xs rounded-md bg-muted/40 border p-3">
                 {generationProgress.map((msg, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-muted-foreground flex-shrink-0">
+                  <div key={i} className="flex items-start gap-2.5">
+                    <span className="text-muted-foreground/70 flex-shrink-0 tabular-nums">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-foreground">{msg}</span>
+                    <span className="text-foreground leading-relaxed">{msg}</span>
                   </div>
                 ))}
                 {generationStatus === "generating" && (
-                  <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  <div className="flex items-center gap-2.5 text-muted-foreground animate-pulse">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
                     <span>Processing…</span>
                   </div>
                 )}
@@ -141,20 +174,32 @@ export default function GenerateStep() {
 
           {/* Success result card */}
           {generationStatus === "done" && generationResult && (
-            <Card className="border-l-4 border-l-green-500">
+            <Card className="relative overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-400/80" />
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-full bg-green-100">
-                    <Zap className="h-4 w-4 text-green-600" />
+                  <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-900/50 flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-foreground">Generation Complete</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {generationResult.rows_generated.toLocaleString()} synthetic patients created
-                      using <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{generationResult.model_used}</span>
+                    <div className="flex items-baseline gap-2">
+                      <p className="font-semibold text-foreground">Generation Complete</p>
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                        success
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      <span className="font-semibold text-foreground tabular-nums">
+                        {generationResult.rows_generated.toLocaleString()}
+                      </span>{" "}
+                      synthetic patients created using{" "}
+                      <span className="font-mono text-xs bg-muted border rounded px-1.5 py-0.5 text-foreground">
+                        {generationResult.model_used}
+                      </span>
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Zero real patient rows were used — only statistical metadata crossed the privacy boundary.
+                    <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                      Zero real patient rows were used — only statistical metadata crossed the
+                      privacy boundary.
                     </p>
                   </div>
                 </div>
@@ -163,30 +208,49 @@ export default function GenerateStep() {
           )}
 
           {generationStatus === "error" && (
-            <Card className="border-l-4 border-l-destructive">
+            <Card className="relative overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-0.5 bg-rose-400/80" />
               <CardContent className="pt-4 pb-4">
-                <p className="text-sm text-destructive font-medium">Generation failed.</p>
-                <p className="text-xs text-muted-foreground mt-1">Server connection lost. Click Start Over to begin a fresh session.</p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-3"
-                  onClick={() => dispatch({ type: "RESET" })}
-                >
-                  Start Over
-                </Button>
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200/70 dark:border-rose-900/50 flex items-center justify-center">
+                    <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-foreground">Generation failed</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Server connection lost. Start over to begin a fresh session.
+                    </p>
+                    <button
+                      onClick={() => dispatch({ type: "RESET" })}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-card hover:bg-muted text-foreground text-xs font-medium px-3 py-1.5 transition-colors"
+                    >
+                      Start Over
+                    </button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
 
-          <Button
-            className="w-full"
-            size="lg"
+          <button
             disabled={generationStatus !== "done"}
             onClick={() => dispatch({ type: "SET_STEP", step: 5 })}
+            className="group w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
           >
-            {generationStatus === "done" ? "View Fidelity Report →" : "Generating…"}
-          </Button>
+            {generationStatus === "done" ? (
+              <>
+                View Fidelity Report
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+              </>
+            ) : generationStatus === "error" ? (
+              "Generation failed"
+            ) : (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating…
+              </>
+            )}
+          </button>
         </div>
 
         {/* Right: Agent */}

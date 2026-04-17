@@ -1,10 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlertTriangle, AlertCircle, Info, CheckCircle2, Wrench } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import {
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  CheckCircle2,
+  Wrench,
+  Sparkles,
+  ArrowRight,
+  Loader2,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import AgentPanel from "@/components/AgentPanel"
 import { usePipeline } from "@/app/pipeline/context"
 import { runHygiene, applyHygieneFixes } from "@/lib/api"
@@ -12,7 +20,7 @@ import { type HygieneIssue, PERSONAS } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 const SEVERITY_ICON: Record<string, React.ReactNode> = {
-  CRITICAL: <AlertCircle className="h-4 w-4 text-red-500" />,
+  CRITICAL: <AlertCircle className="h-4 w-4 text-rose-500" />,
   WARNING: <AlertTriangle className="h-4 w-4 text-amber-500" />,
   INFO: <Info className="h-4 w-4 text-blue-500" />,
 }
@@ -20,6 +28,11 @@ const SEVERITY_BADGE: Record<string, "critical" | "warning" | "secondary"> = {
   CRITICAL: "critical",
   WARNING: "warning",
   INFO: "secondary",
+}
+const SEVERITY_ACCENT: Record<string, string> = {
+  CRITICAL: "bg-rose-400/80",
+  WARNING: "bg-amber-400/80",
+  INFO: "bg-blue-400/80",
 }
 
 export default function HygieneStep() {
@@ -59,21 +72,44 @@ export default function HygieneStep() {
     ? `I've run the hygiene audit on this dataset for a ${persona?.label}. Found ${hygieneIssues.length} issues including ${hygieneIssues.filter((i) => i.severity === "CRITICAL").length} critical. Please explain the most important issues and what impact they would have on synthetic data quality.`
     : `Running hygiene audit for a ${persona?.label}…`
 
+  const criticalCount = (hygieneIssues || []).filter((i) => i.severity === "CRITICAL").length
+  const warningCount = (hygieneIssues || []).filter((i) => i.severity === "WARNING").length
+  const infoCount = (hygieneIssues || []).filter((i) => i.severity === "INFO").length
+
   return (
-    <div className="flex-1 flex flex-col p-6 gap-6 overflow-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Issues */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Data Hygiene Review</h3>
-            {loading && <span className="text-sm text-muted-foreground animate-pulse">Scanning…</span>}
-            {hygieneIssues && (
-              <div className="flex gap-2">
-                <Badge variant="critical">{hygieneIssues.filter((i) => i.severity === "CRITICAL").length} Critical</Badge>
-                <Badge variant="warning">{hygieneIssues.filter((i) => i.severity === "WARNING").length} Warnings</Badge>
-              </div>
-            )}
+    <div className="flex-1 flex flex-col p-4 sm:p-6 gap-4 overflow-auto">
+      {/* Step header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-[10px] font-semibold px-2 py-0.5 rounded-full border border-primary/20 uppercase tracking-widest mb-1.5">
+            <Sparkles className="h-2.5 w-2.5" />
+            Step 03 · Hygiene Audit
           </div>
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">
+            Data Hygiene Review
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Auto-detected data quality and privacy issues. Resolve critical items before generation.
+          </p>
+        </div>
+        {hygieneIssues && (
+          <div className="flex gap-1.5 flex-wrap">
+            <SummaryPill count={criticalCount} label="Critical" tone="rose" />
+            <SummaryPill count={warningCount} label="Warnings" tone="amber" />
+            <SummaryPill count={infoCount} label="Info" tone="blue" />
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left: Issues */}
+        <div className="space-y-3">
+          {loading && (
+            <div className="rounded-xl border bg-card p-6 flex items-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              Scanning dataset for hygiene issues…
+            </div>
+          )}
 
           {hygieneIssues?.map((issue) => {
             const isFixed = appliedFixes.includes(issue.id)
@@ -81,44 +117,61 @@ export default function HygieneStep() {
               <Card
                 key={issue.id}
                 className={cn(
-                  "border-l-4 transition-all",
-                  issue.severity === "CRITICAL" && !isFixed && "border-l-red-500",
-                  issue.severity === "CRITICAL" && isFixed && "border-l-green-500 opacity-75",
-                  issue.severity === "WARNING" && !isFixed && "border-l-amber-500",
-                  issue.severity === "WARNING" && isFixed && "border-l-green-500 opacity-75",
-                  issue.severity === "INFO" && "border-l-blue-400"
+                  "relative overflow-hidden transition-all hover:shadow-sm",
+                  isFixed && "opacity-75"
                 )}
               >
-                <CardContent className="pt-4 pb-4">
+                <div
+                  className={cn(
+                    "absolute inset-y-0 left-0 w-1",
+                    isFixed ? "bg-emerald-400" : SEVERITY_ACCENT[issue.severity]
+                  )}
+                />
+                <CardContent className="pt-4 pb-4 pl-5">
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5">{SEVERITY_ICON[issue.severity]}</div>
+                    <div className="mt-0.5">
+                      {isFixed ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        SEVERITY_ICON[issue.severity]
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant={SEVERITY_BADGE[issue.severity]} className="text-xs">
+                        <Badge
+                          variant={SEVERITY_BADGE[issue.severity]}
+                          className="text-[10px] h-5"
+                        >
                           {issue.severity}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">{issue.category}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {issue.affected_count} rows affected
+                        <span className="text-[11px] text-muted-foreground font-medium">
+                          {issue.category}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          · {issue.affected_count.toLocaleString()} rows
                         </span>
                         {isFixed && (
-                          <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                          <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold ml-auto">
                             <CheckCircle2 className="h-3 w-3" /> Fixed
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-foreground mt-1.5 leading-snug">{issue.description}</p>
+                      <p className="text-sm text-foreground mt-1.5 leading-relaxed">
+                        {issue.description}
+                      </p>
                       {issue.fixable && !isFixed && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-2 h-7 text-xs gap-1"
+                        <button
                           disabled={applying === issue.id}
                           onClick={() => handleFix(issue.id)}
+                          className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-medium px-3 py-1.5 transition-colors disabled:opacity-60"
                         >
-                          <Wrench className="h-3 w-3" />
+                          {applying === issue.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Wrench className="h-3 w-3" />
+                          )}
                           {applying === issue.id ? "Applying…" : "Apply Fix"}
-                        </Button>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -128,24 +181,34 @@ export default function HygieneStep() {
           })}
 
           {!loading && hygieneIssues?.length === 0 && (
-            <Card className="border-l-4 border-l-green-500">
-              <CardContent className="pt-4 pb-4 flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <span className="text-sm font-medium text-foreground">No issues detected — data is ready for synthetic generation.</span>
+            <Card className="relative overflow-hidden">
+              <div className="absolute inset-y-0 left-0 w-1 bg-emerald-400" />
+              <CardContent className="pt-5 pb-5 pl-5 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-900/50 flex items-center justify-center">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-foreground">All clear.</div>
+                  <div className="text-xs text-muted-foreground">
+                    No issues detected — data is ready for synthetic generation.
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
 
-          <Button
-            className="w-full"
-            size="lg"
+          <button
             disabled={criticalUnresolved.length > 0}
             onClick={() => dispatch({ type: "SET_STEP", step: 4 })}
+            className="group w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
           >
             {criticalUnresolved.length > 0
-              ? `Fix ${criticalUnresolved.length} critical issue(s) first`
-              : "Proceed to Generation →"}
-          </Button>
+              ? `Fix ${criticalUnresolved.length} critical issue${criticalUnresolved.length === 1 ? "" : "s"} first`
+              : "Proceed to Generation"}
+            {criticalUnresolved.length === 0 && (
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+            )}
+          </button>
         </div>
 
         {/* Right: Agent */}
@@ -157,6 +220,33 @@ export default function HygieneStep() {
           className="h-full min-h-[500px]"
         />
       </div>
+    </div>
+  )
+}
+
+function SummaryPill({
+  count,
+  label,
+  tone,
+}: {
+  count: number
+  label: string
+  tone: "rose" | "amber" | "blue"
+}) {
+  const toneClass = {
+    rose: "bg-rose-50 dark:bg-rose-950/30 border-rose-200/70 dark:border-rose-900/50 text-rose-700 dark:text-rose-400",
+    amber: "bg-amber-50 dark:bg-amber-950/30 border-amber-200/70 dark:border-amber-900/50 text-amber-700 dark:text-amber-400",
+    blue: "bg-blue-50 dark:bg-blue-950/30 border-blue-200/70 dark:border-blue-900/50 text-blue-700 dark:text-blue-400",
+  }[tone]
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium",
+        toneClass
+      )}
+    >
+      <span className="font-bold tabular-nums">{count}</span>
+      <span>{label}</span>
     </div>
   )
 }
