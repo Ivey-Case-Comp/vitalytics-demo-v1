@@ -65,7 +65,7 @@ export default function HygieneStep() {
         {/* Left: Issues */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">Data Quality Audit</h3>
+            <h3 className="font-semibold text-foreground">Data Hygiene Review</h3>
             {loading && <span className="text-sm text-muted-foreground animate-pulse">Scanning…</span>}
             {hygieneIssues && (
               <div className="flex gap-2">
@@ -83,9 +83,9 @@ export default function HygieneStep() {
                 className={cn(
                   "border-l-4 transition-all",
                   issue.severity === "CRITICAL" && !isFixed && "border-l-red-500",
-                  issue.severity === "CRITICAL" && isFixed && "border-l-green-500 opacity-60",
+                  issue.severity === "CRITICAL" && isFixed && "border-l-green-500 opacity-75",
                   issue.severity === "WARNING" && !isFixed && "border-l-amber-500",
-                  issue.severity === "WARNING" && isFixed && "border-l-green-500 opacity-60",
+                  issue.severity === "WARNING" && isFixed && "border-l-green-500 opacity-75",
                   issue.severity === "INFO" && "border-l-blue-400"
                 )}
               >
@@ -117,7 +117,7 @@ export default function HygieneStep() {
                           onClick={() => handleFix(issue.id)}
                         >
                           <Wrench className="h-3 w-3" />
-                          {applying === issue.id ? "Applying…" : "Fix in Metadata"}
+                          {applying === issue.id ? "Applying…" : "Apply Fix"}
                         </Button>
                       )}
                     </div>
@@ -131,7 +131,7 @@ export default function HygieneStep() {
             <Card className="border-l-4 border-l-green-500">
               <CardContent className="pt-4 pb-4 flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <span className="text-sm font-medium text-foreground">No hygiene issues detected.</span>
+                <span className="text-sm font-medium text-foreground">No issues detected — data is ready for synthetic generation.</span>
               </CardContent>
             </Card>
           )}

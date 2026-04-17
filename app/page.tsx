@@ -26,7 +26,7 @@ export default function LandingPage() {
       <section className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24 gap-8">
         <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-sm font-medium px-4 py-1.5 rounded-full border border-primary/20">
           <Shield className="h-3.5 w-3.5" />
-          Southlake Health Hackathon — April 2026
+          Southlake Health Ivey MSc Hackathon 2026
         </div>
 
         <div className="max-w-3xl space-y-4">
@@ -59,7 +59,7 @@ export default function LandingPage() {
         {/* Trust signals */}
         <div className="flex gap-6 flex-wrap justify-center text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-500" /> Zero PHI Exposure</span>
-          <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-500" /> MIA AUC ~0.51</span>
+          <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-500" /> Clinically Realistic Output</span>
           <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-500" /> PHIPA-Ready</span>
           <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4 text-green-500" /> Metadata-Only Extraction</span>
         </div>
@@ -89,7 +89,7 @@ export default function LandingPage() {
       {/* Persona row */}
       <section className="py-16 px-4">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-2xl font-bold text-center text-foreground mb-3">Built for Every Healthcare Role</h2>
+          <h2 className="text-2xl font-bold text-center text-foreground mb-3">Every Role Gets a Tailored Explanation</h2>
           <p className="text-center text-muted-foreground mb-10 max-w-xl mx-auto">
             The AI agent adapts its explanations to your role — from bedside nurses to hospital CIOs.
           </p>
@@ -105,7 +105,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t py-6 text-center text-xs text-muted-foreground">
-        Vitalytics · Southlake Health Hackathon · April 2026 · Built with Next.js + FastAPI + Claude claude-opus-4-6
+        Vitalytics · Southlake Health Ivey MSc Hackathon 2026 · Built with Next.js + FastAPI + Gemini 2.0 Flash
       </footer>
     </div>
   )
@@ -114,27 +114,27 @@ export default function LandingPage() {
 const PIPELINE_STEPS = [
   {
     label: "Upload",
-    description: "Load any healthcare CSV or use the Synthea demo dataset",
+    description: "Load the Synthea demo or upload your own healthcare CSV",
     icon: Lock,
   },
   {
     label: "Profile",
-    description: "Extract statistical metadata — no raw rows stored",
+    description: "Extract statistical metadata — no raw patient rows stored",
     icon: BarChart3,
   },
   {
     label: "Hygiene Audit",
-    description: "Detect ICD errors, missing data, clinical implausibility",
+    description: "Auto-detect data quality issues and apply privacy fixes",
     icon: Shield,
   },
   {
     label: "Generate",
-    description: "Sample new patients from fitted statistical distributions",
+    description: "Synthesize a new patient population from statistical distributions",
     icon: Brain,
   },
   {
     label: "Verify",
-    description: "Fidelity scoring + MIA privacy audit + download",
+    description: "Score fidelity, run privacy audit, and download the synthetic CSV",
     icon: CheckCircle,
   },
 ]

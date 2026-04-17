@@ -45,7 +45,7 @@ is ready for synthetic generation. Dataset: ${metadata.table}, ${metadata.row_co
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Stat label="Rows" value={metadata.row_count.toLocaleString()} />
-                <Stat label="Columns (kept)" value={Object.keys(metadata.columns).length} />
+                <Stat label="Active Columns" value={Object.keys(metadata.columns).length} />
                 <Stat label="Numeric" value={numericCols.length} />
                 <Stat label="Categorical" value={categoricalCols.length} />
                 <Stat label="Datetime" value={datetimeCols.length} />
@@ -64,7 +64,7 @@ is ready for synthetic generation. Dataset: ${metadata.table}, ${metadata.row_co
             </CardHeader>
             <CardContent className="space-y-2">
               {metadata.privacy_actions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No identifiers detected.</p>
+                <p className="text-sm text-muted-foreground">No sensitive identifiers detected — data is safe to profile.</p>
               ) : (
                 metadata.privacy_actions.map((action, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm">
@@ -87,7 +87,12 @@ is ready for synthetic generation. Dataset: ${metadata.table}, ${metadata.row_co
           {/* Column previews */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Column Statistics (top 6)</CardTitle>
+              <CardTitle className="text-base flex items-baseline gap-2">
+                Column Overview
+                <span className="text-xs font-normal text-muted-foreground">
+                  (showing 6 of {Object.keys(metadata.columns).length})
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -100,7 +105,7 @@ is ready for synthetic generation. Dataset: ${metadata.table}, ${metadata.row_co
                         <span className="text-xs text-muted-foreground">{(stat.null_rate * 100).toFixed(1)}% null</span>
                       )}
                       {stat.type === "continuous" && stat.mean !== undefined && (
-                        <span className="text-xs text-muted-foreground">μ={stat.mean.toFixed(1)}</span>
+                        <span className="text-xs text-muted-foreground">avg {stat.mean.toFixed(1)}</span>
                       )}
                     </div>
                   </div>

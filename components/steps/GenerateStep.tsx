@@ -166,7 +166,7 @@ export default function GenerateStep() {
             <Card className="border-l-4 border-l-destructive">
               <CardContent className="pt-4 pb-4">
                 <p className="text-sm text-destructive font-medium">Generation failed.</p>
-                <p className="text-xs text-muted-foreground mt-1">Make sure the backend is running, then start a new session.</p>
+                <p className="text-xs text-muted-foreground mt-1">Server connection lost. Click Start Over to begin a fresh session.</p>
                 <Button
                   size="sm"
                   variant="outline"

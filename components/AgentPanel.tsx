@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { Brain, Wrench, CheckCircle, AlertCircle, ChevronDown, ChevronRight } from "lucide-react"
+
+const PERSONA_LABELS: Record<string, string> = {
+  nurse: "Nurse View",
+  analyst: "Analyst View",
+  population_health: "Pop. Health View",
+  researcher: "Researcher View",
+  cio: "CIO View",
+}
 import { type SSEEvent, type PersonaKey } from "@/lib/types"
 import { streamChat } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -135,6 +143,7 @@ export default function AgentPanel({
         <div className="flex items-center gap-2">
           <Brain className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold text-foreground">Agent Reasoning</span>
+          <span className="text-xs text-muted-foreground font-normal">· {PERSONA_LABELS[role] ?? role}</span>
         </div>
         <div className="flex items-center gap-1.5">
           {status === "streaming" && (
@@ -145,7 +154,7 @@ export default function AgentPanel({
           )}
           {status === "done" && <span className="text-xs text-green-600 font-medium">Complete</span>}
           {status === "error" && <span className="text-xs text-destructive">Error</span>}
-          {status === "idle" && <span className="text-xs text-muted-foreground">Waiting…</span>}
+          {status === "idle" && <span className="text-xs text-muted-foreground">Ready</span>}
         </div>
       </div>
 
@@ -153,7 +162,7 @@ export default function AgentPanel({
       <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[420px] font-mono text-xs">
         {events.length === 0 && status === "idle" && (
           <p className="text-muted-foreground text-xs italic text-center pt-8">
-            Agent will start when this step activates…
+            Analysis will appear here once the step loads.
           </p>
         )}
         {events.length === 0 && status === "streaming" && (

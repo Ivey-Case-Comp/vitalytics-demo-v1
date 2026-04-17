@@ -139,20 +139,20 @@ export default function VerifyStep() {
               value={`${fidelityReport.distribution_fidelity.toFixed(1)}`}
               unit="%"
               score={fidelityReport.distribution_fidelity}
-              sub="Wasserstein distance"
+              sub="How closely distributions match"
             />
             <MetricCard
               label="Correlation Fidelity"
               value={`${fidelityReport.correlation_fidelity.toFixed(1)}`}
               unit="%"
               score={fidelityReport.correlation_fidelity}
-              sub="Frobenius norm"
+              sub="How well column relationships are preserved"
             />
             <MetricCard
               label="TSTR Ratio"
               value={fidelityReport.tstr_ratio.toFixed(2)}
               score={fidelityReport.tstr_ratio * 100}
-              sub="vs real-trained model"
+              sub="Synthetic trains as well as real (1.0 = identical)"
             />
           </div>
 
@@ -170,6 +170,7 @@ export default function VerifyStep() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Per-Column Distributions</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Select a column to compare real vs. synthetic distributions.</p>
               </CardHeader>
               <CardContent>
                 <DistributionOverlay
@@ -218,8 +219,7 @@ export default function VerifyStep() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-foreground">Privacy-Safe Dataset Ready</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        This synthetic dataset passed the MIA (Membership Inference Attack) test.
-                        No real patient records can be reverse-engineered.
+                        Passed the Membership Inference Attack (MIA) test — an adversary cannot determine which real patients (if any) were used to create this dataset.
                       </p>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground">
                         {fidelityReport.model_used && (

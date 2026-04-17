@@ -1,8 +1,10 @@
 # Vitalytics
 
+**Southlake Health Ivey MSc Hackathon 2026**
+
 Privacy-safe synthetic healthcare data generation. Upload a real patient CSV, extract its statistical fingerprint, and generate an unlimited synthetic population — without a single real record ever leaving the privacy boundary.
 
-Built on Next.js 16 + FastAPI, with a Gemini-powered agent that explains every step in plain language tailored to the clinician, analyst, or executive using it.
+Built on Next.js 16 + FastAPI, with a Gemini 2.0 Flash-powered agent that explains every step in plain language tailored to the clinician, analyst, or executive using it.
 
 ---
 
@@ -277,6 +279,7 @@ vitalytics-demo-v1/
 | CORS error in browser console | `FRONTEND_URL` in `backend/.env` doesn't match the Next.js origin exactly — no trailing slash |
 | `Gemini API error: 401` or auth failure | API key missing or invalid — set `DEMO_MOCK=true` to unblock immediately, or check the key format (`AIza...`) |
 | "Generation failed" + "Start Over" button appears | The backend was restarted and the in-memory session was lost. Click "Start Over" to begin a fresh session. |
+| Clicking "↺ Start Over" dismisses without resetting | Browser `confirm()` dialog was cancelled — click it again and confirm to reset. |
 | `Gemini API error: 429` | Free-tier rate limit hit. **Make sure you're using an AI Studio key** ([aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)) — GCP Console keys have 0 quota by default. Wait a minute or check your quotas. |
 | Agent panels show identical text every run | Demo mode is active — see [Enabling live AI](#enabling-live-ai) |
 | Port 8000 already in use | `uvicorn main:app --reload --port 8001` and set `NEXT_PUBLIC_API_URL=http://localhost:8001` in `.env.local` |

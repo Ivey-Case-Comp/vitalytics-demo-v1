@@ -30,10 +30,14 @@ export default function PipelinePage() {
             />
           </div>
           <button
-            onClick={() => dispatch({ type: "RESET" })}
+            onClick={() => {
+              if (window.confirm("Start over? All pipeline progress will be lost.")) {
+                dispatch({ type: "RESET" })
+              }
+            }}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Reset
+            ↺ Start Over
           </button>
         </div>
       </header>

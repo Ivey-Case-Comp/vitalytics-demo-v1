@@ -35,7 +35,7 @@ export default function CorrelationHeatmap({ real, synthetic, columns }: Correla
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground">Correlation Matrix</span>
+        <span className="text-sm font-medium text-foreground">Feature Correlations</span>
         <div className="flex rounded-md border border-border overflow-hidden text-xs">
           <button
             onClick={() => setMode("real")}
@@ -87,6 +87,27 @@ export default function CorrelationHeatmap({ real, synthetic, columns }: Correla
           </tbody>
         </table>
       </div>
+
+      {/* Color legend */}
+      <div className="flex items-center justify-center gap-4 mt-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-6 rounded-sm" style={{ background: "rgb(0,0,239)" }} />
+          <span>Negative</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-6 rounded-sm border border-border" style={{ background: "rgb(239,239,239)" }} />
+          <span>None</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3 w-6 rounded-sm" style={{ background: "rgb(239,0,0)" }} />
+          <span>Positive</span>
+        </div>
+      </div>
+      {columns.length > 8 && (
+        <p className="text-xs text-muted-foreground text-center mt-1">
+          Showing first 8 of {columns.length} columns
+        </p>
+      )}
     </div>
   )
 }

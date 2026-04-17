@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Upload, Database, FileText } from "lucide-react"
+import { Upload, Database, Lock, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { usePipeline } from "@/app/pipeline/context"
@@ -27,7 +27,7 @@ export default function UploadStep() {
       })
       .catch(() => {
         creatingRef.current = false
-        setError("Cannot connect to backend. Make sure FastAPI is running on port 8000.")
+        setError("Cannot connect to the server. Make sure the backend is running (see README for setup).")
       })
   }, [state.sessionId, dispatch])
 
@@ -121,7 +121,7 @@ export default function UploadStep() {
         >
           <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
           <p className="font-medium text-foreground">Drop CSV here or click to browse</p>
-          <p className="text-sm text-muted-foreground mt-1">Accepts any healthcare CSV file</p>
+          <p className="text-sm text-muted-foreground mt-1">Any healthcare CSV · UTF-8 · under 50 MB</p>
           {loading === "upload" && (
             <p className="text-sm text-primary mt-2 animate-pulse">Uploading and extracting metadata…</p>
           )}
@@ -142,9 +142,9 @@ export default function UploadStep() {
       </div>
 
       <div className="flex items-center gap-6 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Zero PHI stored</span>
-        <span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Metadata-only extraction</span>
-        <span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> PHIPA-ready</span>
+        <span className="flex items-center gap-1"><Lock className="h-3.5 w-3.5" /> Zero PHI stored</span>
+        <span className="flex items-center gap-1"><Database className="h-3.5 w-3.5" /> Metadata-only extraction</span>
+        <span className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> PHIPA-ready</span>
       </div>
     </div>
   )
