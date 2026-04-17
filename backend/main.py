@@ -307,10 +307,13 @@ async def chat_stream(req: ChatRequest):
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        # Sync any state changes back to jobs store
-        for key in ("metadata", "hygiene_issues", "synthetic_path", "generation_result", "fidelity", "conversation"):
+        # Sync any state changes back to jobs store.
+        # synthetic_path is written directly by _run_generation — only overwrite if the agent set it.
+        for key in ("metadata", "hygiene_issues", "generation_result", "fidelity", "conversation"):
             if key in agent_state:
                 jobs[req.session_id][key] = agent_state[key]
+        if agent_state.get("synthetic_path"):
+            jobs[req.session_id]["synthetic_path"] = agent_state["synthetic_path"]
 
     return StreamingResponse(
         event_generator(),

@@ -28,9 +28,13 @@ export default function GenerateStep() {
       genStartedRef.current = true
       dispatch({ type: "SET_GEN_STATUS", status: "generating" })
       dispatch({ type: "ADD_GEN_PROGRESS", message: "Initialising generation engine…" })
-      startGeneration(sessionId).catch((e) => {
-        console.error(e)
-        dispatch({ type: "SET_GEN_STATUS", status: "error" })
+      startGeneration(sessionId).catch((e: Error) => {
+        if (e.message.includes("404")) {
+          // Session was lost (e.g. backend restart) — reset and let user start over
+          dispatch({ type: "RESET" })
+        } else {
+          dispatch({ type: "SET_GEN_STATUS", status: "error" })
+        }
       })
     }
 
@@ -57,8 +61,11 @@ export default function GenerateStep() {
           clearInterval(interval)
           dispatch({ type: "SET_GEN_STATUS", status: "error" })
         }
-      } catch (e) {
-        console.error(e)
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message.includes("404")) {
+          clearInterval(interval)
+          dispatch({ type: "RESET" })
+        }
       }
     }, 2000)
 
@@ -159,7 +166,15 @@ export default function GenerateStep() {
             <Card className="border-l-4 border-l-destructive">
               <CardContent className="pt-4 pb-4">
                 <p className="text-sm text-destructive font-medium">Generation failed.</p>
-                <p className="text-xs text-muted-foreground mt-1">Check that the backend is running and try refreshing.</p>
+                <p className="text-xs text-muted-foreground mt-1">Make sure the backend is running, then start a new session.</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => dispatch({ type: "RESET" })}
+                >
+                  Start Over
+                </Button>
               </CardContent>
             </Card>
           )}

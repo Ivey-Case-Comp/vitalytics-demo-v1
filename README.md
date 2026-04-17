@@ -276,7 +276,8 @@ vitalytics-demo-v1/
 | Load Demo button stays disabled | Session creation failed (backend not running). Start the backend first. |
 | CORS error in browser console | `FRONTEND_URL` in `backend/.env` doesn't match the Next.js origin exactly — no trailing slash |
 | `Gemini API error: 401` or auth failure | API key missing or invalid — set `DEMO_MOCK=true` to unblock immediately, or check the key format (`AIza...`) |
-| `Gemini API error: 429` | Free-tier rate limit hit (15 RPM / 1500 req per day). Wait a minute, or bump quotas in Google Cloud |
+| "Generation failed" + "Start Over" button appears | The backend was restarted and the in-memory session was lost. Click "Start Over" to begin a fresh session. |
+| `Gemini API error: 429` | Free-tier rate limit hit. **Make sure you're using an AI Studio key** ([aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)) — GCP Console keys have 0 quota by default. Wait a minute or check your quotas. |
 | Agent panels show identical text every run | Demo mode is active — see [Enabling live AI](#enabling-live-ai) |
 | Port 8000 already in use | `uvicorn main:app --reload --port 8001` and set `NEXT_PUBLIC_API_URL=http://localhost:8001` in `.env.local` |
 | `ModuleNotFoundError` on backend start | Venv not activated — run `source backend/venv/bin/activate` first |
