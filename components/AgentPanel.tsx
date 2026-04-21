@@ -1,7 +1,43 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import React, { useEffect, useRef, useState, useCallback } from "react"
 import { Brain, Wrench, CheckCircle, AlertCircle, ChevronDown, ChevronRight } from "lucide-react"
+
+// Render the minimal markdown subset used in agent conclusions: **bold**, newlines, bullet lists.
+function renderMd(text: string): React.ReactNode[] {
+  return text.split("\n\n").map((para, pi) => {
+    const lines = para.split("\n")
+    const isList = lines.every((l) => l.trimStart().startsWith("- ") || l.trim() === "")
+    if (isList) {
+      return (
+        <ul key={pi} className="space-y-0.5 list-none pl-0">
+          {lines.filter((l) => l.trim()).map((l, li) => (
+            <li key={li} className="flex gap-1.5 text-sm text-foreground leading-relaxed">
+              <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary/50 flex-shrink-0" />
+              <span>{inlineMd(l.replace(/^-\s+/, ""))}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    return (
+      <p key={pi} className="text-sm text-foreground leading-relaxed">
+        {lines.map((l, li) => (
+          <span key={li}>{inlineMd(l)}{li < lines.length - 1 ? <br /> : null}</span>
+        ))}
+      </p>
+    )
+  })
+}
+
+function inlineMd(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/)
+  return parts.map((p, i) =>
+    p.startsWith("**") && p.endsWith("**")
+      ? <strong key={i} className="font-semibold">{p.slice(2, -2)}</strong>
+      : <span key={i}>{p}</span>
+  )
+}
 
 const PERSONA_LABELS: Record<string, string> = {
   nurse: "Nurse View",
@@ -68,8 +104,8 @@ function EventRow({ event }: { event: SSEEvent }) {
       )
     case "conclusion":
       return (
-        <div className="rounded-md bg-primary/5 border border-primary/20 p-3">
-          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{event.content}</p>
+        <div className="rounded-md bg-primary/5 border border-primary/20 p-3 space-y-2">
+          {renderMd(event.content ?? "")}
         </div>
       )
     case "error":

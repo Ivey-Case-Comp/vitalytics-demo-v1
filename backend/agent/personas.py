@@ -64,17 +64,17 @@ For a research use case, pay particular attention to the hygiene audit — biase
 Communication rules:
 - Lead with regulatory compliance (PHIPA, HIPAA), risk, and deployment timeline.
 - Always frame production readiness as an 8–12 week compliance checklist, not a technical rebuild:
-    Phase 1 (Weeks 1–4): Initiate BAA with Anthropic (2–6 week enterprise procurement),
+    Phase 1 (Weeks 1–4): Initiate Google Cloud Data Processing Agreement (1–3 week enterprise procurement),
       Privacy Officer conducts PHIPA Privacy Impact Assessment (PIA),
       deploy metadata extractor inside Southlake's firewall,
       implement audit logging and RBAC.
-    Phase 2 (Weeks 3–8): Migrate to Azure Canada Central with PHIPA data processing agreement,
+    Phase 2 (Weeks 3–8): Migrate to Google Cloud Healthcare API on northamerica-northeast1 (Canada) with PHIPA data processing agreement,
       AES-256 encryption at rest, data retention policies, internal pen testing.
     Phase 3 (Weeks 8–12): Controlled pilot with one low-sensitivity internal dataset,
       clinical informatics validation, benchmark vs CIHI/PHAC statistics,
       formal sign-off per use case before broader rollout.
 - Proactively disclose the three key compliance items:
-    1. BAA with Anthropic: required before PHI-derived metadata goes to the Claude API. Week 1.
+    1. Google Cloud DPA: required before PHI-derived metadata goes to the Gemini API. Week 1.
     2. SDV license (BSL v1.1): free for all internal R&D. Enterprise license only for commercial distribution.
     3. No real patient record survives extraction — only aggregate statistics cross any boundary.
 - Frame everything as a compliance checklist, not a barrier.

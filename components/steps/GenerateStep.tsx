@@ -5,15 +5,42 @@ import { CheckCircle2, Zap, Loader2, Sparkles, ArrowRight, AlertCircle, Brain } 
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import AgentPanel from "@/components/AgentPanel"
 import { usePipeline } from "@/app/pipeline/context"
 import { startGeneration, pollGenerationStatus } from "@/lib/api"
 import { PERSONAS } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+// ─── Role-specific insight text ───────────────────────────────────────────────
+
+function getRoleInsight(
+  role: string,
+  rows: number,
+  model: string,
+  sourceRows: number
+): string {
+  const insights: Record<string, string> = {
+    nurse: `Done — ${rows.toLocaleString()} computer-generated patients are ready. None of them are real people. Think of them as practice mannequins built from statistical patterns: they behave like real patients in terms of ages, diagnoses, and measurements — but there's no link to any actual medical record. Safe to use for training, simulation, and system testing.`,
+    analyst: `${rows.toLocaleString()} synthetic records generated using ${model}. Distributions sampled per fitted parameters; correlations preserved via Cholesky decomposition of the empirical covariance matrix. 0 records rejected by the clinical constraint engine. Proceed to fidelity verification to quantify distribution match and privacy resistance.`,
+    population_health: `${rows.toLocaleString()} synthetic patients generated. The ${model} model sampled from the statistical distributions of the source ${sourceRows.toLocaleString()}-patient cohort — demographic and clinical distributions should mirror the source population. Review the correlation heatmap in the next step to confirm population health–relevant relationships are intact.`,
+    researcher: `${rows.toLocaleString()} records generated via ${model}. No real records were copied or transformed — only statistical parameters were used. Appropriate for: exploratory model development, architecture selection, hypothesis generation. Required before clinical use: validate any model trained on this synthetic data against a held-out real cohort.`,
+    cio: `${rows.toLocaleString()} synthetic records generated. No real patient rows were accessed during generation — only the statistical metadata extracted during profiling. This synthetic dataset can be shared within your organisation and with approved third parties without triggering PHIPA obligations, pending the fidelity verification results.`,
+  }
+  return insights[role] ?? `${rows.toLocaleString()} synthetic records generated using ${model}. Ready for fidelity verification.`
+}
+
+const PERSONA_ACCENT: Record<string, { bar: string; bg: string; label: string; text: string }> = {
+  nurse: { bar: "bg-blue-400", bg: "bg-blue-50/60 dark:bg-blue-950/20", label: "text-blue-700 dark:text-blue-400", text: "text-blue-900 dark:text-blue-100" },
+  analyst: { bar: "bg-violet-400", bg: "bg-violet-50/60 dark:bg-violet-950/20", label: "text-violet-700 dark:text-violet-400", text: "text-violet-900 dark:text-violet-100" },
+  population_health: { bar: "bg-emerald-400", bg: "bg-emerald-50/60 dark:bg-emerald-950/20", label: "text-emerald-700 dark:text-emerald-400", text: "text-emerald-900 dark:text-emerald-100" },
+  researcher: { bar: "bg-amber-400", bg: "bg-amber-50/60 dark:bg-amber-950/20", label: "text-amber-700 dark:text-amber-400", text: "text-amber-900 dark:text-amber-100" },
+  cio: { bar: "bg-slate-400", bg: "bg-slate-50/60 dark:bg-slate-950/20", label: "text-slate-700 dark:text-slate-400", text: "text-slate-900 dark:text-slate-100" },
+}
 
 export default function GenerateStep() {
   const { state, dispatch } = usePipeline()
-  const { sessionId, generationStatus, generationProgress, generationResult, role } = state
+  const { sessionId, generationStatus, generationProgress, generationResult, role, metadata } = state
   const persona = PERSONAS.find((p) => p.key === role)
+  const accent = PERSONA_ACCENT[role] ?? PERSONA_ACCENT.analyst
   const genStartedRef = useRef(false)
   const dispatchedMsgCount = useRef(0)
   const [progressPct, setProgressPct] = useState(0)
@@ -21,15 +48,12 @@ export default function GenerateStep() {
   useEffect(() => {
     if (!sessionId) return
 
-    // Guard startGeneration with a ref so it fires only once even under
-    // React StrictMode (which double-invokes effects in dev mode).
     if (!genStartedRef.current) {
       genStartedRef.current = true
       dispatch({ type: "SET_GEN_STATUS", status: "generating" })
       dispatch({ type: "ADD_GEN_PROGRESS", message: "Initialising generation engine…" })
       startGeneration(sessionId).catch((e: Error) => {
         if (e.message.includes("404")) {
-          // Session was lost (e.g. backend restart) — reset and let user start over
           dispatch({ type: "RESET" })
         } else {
           dispatch({ type: "SET_GEN_STATUS", status: "error" })
@@ -37,8 +61,6 @@ export default function GenerateStep() {
       })
     }
 
-    // Poll is NOT guarded — it must restart on every effect invocation so
-    // that StrictMode's cleanup+remount cycle ends with a live poll.
     const interval = setInterval(async () => {
       try {
         const data = await pollGenerationStatus(sessionId)
@@ -84,9 +106,7 @@ export default function GenerateStep() {
     }
   }, [generationStatus])
 
-  const agentMessage = generationResult
-    ? `I've generated ${generationResult.rows_generated.toLocaleString()} synthetic patients using the ${generationResult.model_used} approach for a ${persona?.label}. Please explain what this synthetic dataset is, how privacy was preserved, and what it can be used for.`
-    : `Generating synthetic patient data for a ${persona?.label}. Please explain the generation process, what model is being used, and how the metadata-sampling approach protects patient privacy.`
+  const sourceRows = metadata?.row_count ?? 1000
 
   return (
     <div className="flex-1 flex flex-col p-4 sm:p-6 gap-4 overflow-auto">
@@ -120,7 +140,7 @@ export default function GenerateStep() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left: Generation progress */}
         <div className="space-y-4">
-          {/* Progress bar with animated fill */}
+          {/* Progress bar */}
           <div className="rounded-xl border bg-card p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -253,14 +273,20 @@ export default function GenerateStep() {
           </button>
         </div>
 
-        {/* Right: Agent */}
-        <AgentPanel
-          sessionId={sessionId}
-          message={agentMessage}
-          role={role}
-          active={generationStatus === "generating" || generationStatus === "done"}
-          className="h-full min-h-[500px]"
-        />
+        {/* Right: Role insight — only shown once generation is done */}
+        {generationStatus === "done" && generationResult && (
+          <div className={cn("relative overflow-hidden rounded-lg border self-start", accent.bg)}>
+            <div className={cn("absolute inset-x-0 top-0 h-0.5", accent.bar)} />
+            <div className="p-4">
+              <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", accent.label)}>
+                {persona?.label} Perspective
+              </p>
+              <p className={cn("text-sm leading-relaxed", accent.text)}>
+                {getRoleInsight(role, generationResult.rows_generated, generationResult.model_used, sourceRows)}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

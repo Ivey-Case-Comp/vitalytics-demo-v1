@@ -1,9 +1,8 @@
 "use client"
 
-import { Sparkles, RotateCcw, UserCircle2 } from "lucide-react"
+import { Sparkles, RotateCcw } from "lucide-react"
 import { usePipeline } from "@/app/pipeline/context"
 import PipelineNav from "@/components/PipelineNav"
-import RoleSelector from "@/components/RoleSelector"
 import UploadStep from "@/components/steps/UploadStep"
 import ProfileStep from "@/components/steps/ProfileStep"
 import HygieneStep from "@/components/steps/HygieneStep"
@@ -13,7 +12,7 @@ import type { PipelineStep } from "@/lib/types"
 
 export default function PipelinePage() {
   const { state, dispatch } = usePipeline()
-  const { currentStep, role } = state
+  const { currentStep } = state
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
@@ -48,30 +47,6 @@ export default function PipelinePage() {
           </button>
         </div>
       </header>
-
-      {/* Role selector bar */}
-      {currentStep > 1 && (
-        <div className="flex-shrink-0 border-b bg-muted/20 px-4 py-2">
-          <div className="max-w-screen-xl mx-auto flex items-center gap-4">
-            <div className="flex-shrink-0 hidden md:flex items-center gap-2">
-              <div className="h-7 w-7 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <UserCircle2 className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-foreground leading-tight">Agent view</p>
-                <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                  Commentary adapts to role
-                </p>
-              </div>
-            </div>
-            <div className="hidden md:block w-px h-8 bg-border flex-shrink-0" />
-            <RoleSelector
-              currentRole={role}
-              onSelect={(r) => dispatch({ type: "SET_ROLE", role: r })}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Step content */}
       <main className="flex-1 overflow-auto flex flex-col">

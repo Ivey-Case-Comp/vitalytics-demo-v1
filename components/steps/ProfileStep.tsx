@@ -1,9 +1,10 @@
 "use client"
 
-import { Shield, EyeOff, Database, ArrowRight, Sparkles } from "lucide-react"
+import { Shield, EyeOff, Database, ArrowRight, Sparkles, UserCircle2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import AgentPanel from "@/components/AgentPanel"
+import RoleSelector from "@/components/RoleSelector"
 import { usePipeline } from "@/app/pipeline/context"
 import { PERSONAS } from "@/lib/types"
 
@@ -24,9 +25,18 @@ export default function ProfileStep() {
   const categoricalCols = Object.entries(metadata.columns).filter(([, m]) => m.type === "categorical")
   const datetimeCols = Object.entries(metadata.columns).filter(([, m]) => m.type === "datetime")
 
-  const agentMessage = `Please analyze this healthcare dataset profile for a ${persona?.label}.
-Explain the key statistical findings, what the privacy safeguards detected, and whether this data
-is ready for synthetic generation. Dataset: ${metadata.table}, ${metadata.row_count} rows.`
+  const agentMessage = [
+    `Please analyze this healthcare dataset profile for a ${persona?.label}.`,
+    `Dataset: ${metadata.table}, ${metadata.row_count.toLocaleString()} rows, ${Object.keys(metadata.columns).length} active columns.`,
+    metadata.suppressed_columns.length > 0
+      ? `Direct identifiers suppressed: ${metadata.suppressed_columns.join(", ")}.`
+      : "No direct identifiers detected.",
+    metadata.privacy_actions.length > 0
+      ? `Privacy actions applied: ${metadata.privacy_actions.slice(0, 3).join("; ")}${metadata.privacy_actions.length > 3 ? " ..." : ""}.`
+      : "",
+    `Column types: ${numericCols.length} numeric, ${categoricalCols.length} categorical, ${datetimeCols.length} datetime.`,
+    "Explain the key statistical findings, what privacy safeguards fired, and whether this data is ready for synthetic generation.",
+  ].filter(Boolean).join(" ")
 
   return (
     <div className="flex-1 flex flex-col p-4 sm:p-6 gap-4 overflow-auto">
@@ -46,6 +56,25 @@ is ready for synthetic generation. Dataset: ${metadata.table}, ${metadata.row_co
             {Object.keys(metadata.columns).length} active columns
           </p>
         </div>
+      </div>
+
+      {/* Role picker — locked after this step */}
+      <div className="rounded-xl border bg-card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-7 w-7 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <UserCircle2 className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground leading-tight">Choose your analysis perspective</p>
+            <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+              Agent commentary and insights adapt to your role. This selection applies to all remaining steps.
+            </p>
+          </div>
+        </div>
+        <RoleSelector
+          currentRole={role}
+          onSelect={(r) => dispatch({ type: "SET_ROLE", role: r })}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -159,8 +188,9 @@ is ready for synthetic generation. Dataset: ${metadata.table}, ${metadata.row_co
           </button>
         </div>
 
-        {/* Right: Agent panel */}
+        {/* Right: Agent panel — re-mounts when role changes */}
         <AgentPanel
+          key={role}
           sessionId={sessionId}
           message={agentMessage}
           role={role}

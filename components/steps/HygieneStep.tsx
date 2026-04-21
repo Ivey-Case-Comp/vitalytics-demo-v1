@@ -13,7 +13,6 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import AgentPanel from "@/components/AgentPanel"
 import { usePipeline } from "@/app/pipeline/context"
 import { runHygiene, applyHygieneFixes } from "@/lib/api"
 import { type HygieneIssue, PERSONAS } from "@/lib/types"
@@ -35,12 +34,66 @@ const SEVERITY_ACCENT: Record<string, string> = {
   INFO: "bg-blue-400/80",
 }
 
+// ─── Role-specific insight text ───────────────────────────────────────────────
+
+function getRoleInsight(role: string, issues: HygieneIssue[]): string {
+  const critical = issues.filter((i) => i.severity === "CRITICAL")
+  const warnings = issues.filter((i) => i.severity === "WARNING")
+
+  if (issues.length === 0) {
+    const clear: Record<string, string> = {
+      nurse: "All quality checks passed — this data is safe for care training and simulation. No coding errors or unusual gaps detected.",
+      analyst: "Hygiene audit clean across all 6 categories. ICD codes valid, null rates within threshold, no demographic skew above tolerance. Proceed to generation.",
+      population_health: "No demographic skew detected relative to Ontario benchmarks — the cohort appears representative. Safe to generate a synthetic population.",
+      researcher: "No systematic biases detected in the source data. Clean audit — proceed to generation with confidence that source biases won't be amplified.",
+      cio: "All clinical data quality gates passed. No issues require resolution before generation.",
+    }
+    return clear[role] ?? "All hygiene checks passed. Proceed to generation."
+  }
+
+  const topCritical = critical[0]?.description ?? ""
+  const topWarning = warnings[0]?.description ?? ""
+
+  const insights: Record<string, string> = {
+    nurse: critical.length > 0
+      ? `There ${critical.length === 1 ? "is" : "are"} ${critical.length} issue${critical.length === 1 ? "" : "s"} that need fixing before the synthetic patients can be created. The most important: ${topCritical}. Leaving it unfixed could produce unrealistic training scenarios. Apply the fix below, then proceed.`
+      : `No critical issues — data is safe to generate from. ${warnings.length > 0 ? `${warnings.length} minor item(s) noted: ${topWarning}.` : ""}`,
+    analyst: `${issues.length} issue(s) detected — ${critical.length} critical, ${warnings.length} warnings. ${critical.length > 0 ? `Critical: ${critical.slice(0, 2).map((i) => i.description).join("; ")}. Unresolved criticals propagate structural errors into the synthetic dataset.` : "No critical issues — proceed to generation."}`,
+    population_health: (() => {
+      const demoIssues = issues.filter(
+        (i) => i.category.toLowerCase().includes("demographic") || i.description.toLowerCase().includes("skew")
+      )
+      if (demoIssues.length > 0) {
+        return `Demographic representativeness issue(s) detected (${demoIssues.length}): ${demoIssues[0].description}. These skews carry through to the synthetic cohort — acknowledge before using for equity-focused interventions. ${critical.length > 0 ? `Fix ${critical.length} critical issue(s) first.` : ""}`
+      }
+      return `No demographic skew detected. ${critical.length > 0 ? `${critical.length} critical issue(s) require resolution before generation: ${topCritical}.` : `${warnings.length > 0 ? warnings.length + " warning(s) noted — low severity, can proceed." : "Ready to generate."}`}`
+    })(),
+    researcher: `${issues.length} issue(s) detected. ${critical.length > 0 ? `Critical: ${topCritical}. ` : ""}${warnings.length > 0 ? `${warnings.length} warning(s) represent systematic patterns that will be preserved — and amplified — in the synthetic output: ${topWarning}. Document as methodology limitations if you proceed.` : "No systematic biases that would affect research validity."}`,
+    cio: critical.length > 0
+      ? `${critical.length} critical issue(s) require resolution before generation (governance risk: structural errors in synthetic output). ${topCritical}. Apply all fixes before proceeding — fixes modify statistical metadata only, no raw patient data is accessed.`
+      : `No critical compliance risks. ${warnings.length} warning(s) noted but within acceptable thresholds. Proceed to generation.`,
+  }
+
+  return insights[role] ?? `${issues.length} issue(s): ${critical.length} critical, ${warnings.length} warnings. ${critical.length > 0 ? "Resolve critical issues before generation." : "Ready to generate."}`
+}
+
+// ─── Persona accent colours ───────────────────────────────────────────────────
+
+const PERSONA_ACCENT: Record<string, { bar: string; bg: string; label: string; text: string }> = {
+  nurse: { bar: "bg-blue-400", bg: "bg-blue-50/60 dark:bg-blue-950/20", label: "text-blue-700 dark:text-blue-400", text: "text-blue-900 dark:text-blue-100" },
+  analyst: { bar: "bg-violet-400", bg: "bg-violet-50/60 dark:bg-violet-950/20", label: "text-violet-700 dark:text-violet-400", text: "text-violet-900 dark:text-violet-100" },
+  population_health: { bar: "bg-emerald-400", bg: "bg-emerald-50/60 dark:bg-emerald-950/20", label: "text-emerald-700 dark:text-emerald-400", text: "text-emerald-900 dark:text-emerald-100" },
+  researcher: { bar: "bg-amber-400", bg: "bg-amber-50/60 dark:bg-amber-950/20", label: "text-amber-700 dark:text-amber-400", text: "text-amber-900 dark:text-amber-100" },
+  cio: { bar: "bg-slate-400", bg: "bg-slate-50/60 dark:bg-slate-950/20", label: "text-slate-700 dark:text-slate-400", text: "text-slate-900 dark:text-slate-100" },
+}
+
 export default function HygieneStep() {
   const { state, dispatch } = usePipeline()
   const { sessionId, hygieneIssues, appliedFixes, role } = state
   const [loading, setLoading] = useState(false)
   const [applying, setApplying] = useState<string | null>(null)
   const persona = PERSONAS.find((p) => p.key === role)
+  const accent = PERSONA_ACCENT[role] ?? PERSONA_ACCENT.analyst
 
   useEffect(() => {
     if (!sessionId || hygieneIssues !== null) return
@@ -67,10 +120,6 @@ export default function HygieneStep() {
   const criticalUnresolved = (hygieneIssues || []).filter(
     (i) => i.severity === "CRITICAL" && i.fixable && !appliedFixes.includes(i.id)
   )
-
-  const agentMessage = hygieneIssues
-    ? `I've run the hygiene audit on this dataset for a ${persona?.label}. Found ${hygieneIssues.length} issues including ${hygieneIssues.filter((i) => i.severity === "CRITICAL").length} critical. Please explain the most important issues and what impact they would have on synthetic data quality.`
-    : `Running hygiene audit for a ${persona?.label}…`
 
   const criticalCount = (hygieneIssues || []).filter((i) => i.severity === "CRITICAL").length
   const warningCount = (hygieneIssues || []).filter((i) => i.severity === "WARNING").length
@@ -211,14 +260,20 @@ export default function HygieneStep() {
           </button>
         </div>
 
-        {/* Right: Agent */}
-        <AgentPanel
-          sessionId={sessionId}
-          message={agentMessage}
-          role={role}
-          active={!loading && hygieneIssues !== null}
-          className="h-full min-h-[500px]"
-        />
+        {/* Right: Role insight (replaces agent panel) */}
+        {!loading && hygieneIssues !== null && (
+          <div className={cn("relative overflow-hidden rounded-lg border", accent.bg)}>
+            <div className={cn("absolute inset-x-0 top-0 h-0.5", accent.bar)} />
+            <div className="p-4">
+              <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", accent.label)}>
+                {persona?.label} Perspective
+              </p>
+              <p className={cn("text-sm leading-relaxed", accent.text)}>
+                {getRoleInsight(role, hygieneIssues)}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

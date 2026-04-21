@@ -11,19 +11,86 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import AgentPanel from "@/components/AgentPanel"
 import DistributionOverlay from "@/components/charts/DistributionOverlay"
 import CorrelationHeatmap from "@/components/charts/CorrelationHeatmap"
 import MiaGauge from "@/components/charts/MiaGauge"
 import { usePipeline } from "@/app/pipeline/context"
 import { runVerification, getDownloadUrl } from "@/lib/api"
-import { PERSONAS } from "@/lib/types"
+import { type FidelityReport, PERSONAS } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+// ─── Role-specific insight text ───────────────────────────────────────────────
+
+function getRoleInsight(role: string, report: FidelityReport): string {
+  const { overall_score, distribution_fidelity, correlation_fidelity, mia_auc, tstr_ratio } = report
+  const passed = overall_score >= 80 && mia_auc < 0.65
+
+  const miaStrong = mia_auc < 0.55
+  const miaOk = mia_auc < 0.65
+
+  switch (role) {
+    case "nurse": {
+      const miaPlain = miaStrong
+        ? "essentially impossible — like guessing heads or tails"
+        : miaOk
+        ? "very difficult"
+        : "showing some risk — review before use"
+      return passed
+        ? `Score: ${overall_score.toFixed(0)}/100. Your synthetic patients match real patient patterns very closely. Most importantly, we ran a privacy test where a computer tried to guess whether any specific real patient was used — result: ${miaPlain}. Safe to use for training and simulation.`
+        : `Score: ${overall_score.toFixed(0)}/100 — some differences were detected. Review the charts below before use in high-stakes training scenarios.`
+    }
+    case "analyst":
+      return (
+        `Overall: ${overall_score.toFixed(1)}/100 (${overall_score >= 80 ? "✓ above threshold" : "✗ below 80 threshold"}) · ` +
+        `Distribution fidelity: ${distribution_fidelity.toFixed(1)}% · ` +
+        `Correlation fidelity: ${correlation_fidelity.toFixed(1)}% · ` +
+        `MIA AUC: ${mia_auc.toFixed(3)} (${miaStrong ? "strong privacy band <0.55" : miaOk ? "review band 0.55–0.65" : "exceeds 0.65 — investigate leakage"}) · ` +
+        `TSTR: ${tstr_ratio.toFixed(2)} — synthetic trains at ${(tstr_ratio * 100).toFixed(0)}% of real-data performance.`
+      )
+    case "population_health":
+      return (
+        `Distribution fidelity ${distribution_fidelity.toFixed(1)}% confirms the synthetic cohort mirrors source population demographics ` +
+        `${distribution_fidelity >= 85 ? "faithfully" : "with some drift — review per-column charts"}. ` +
+        `Correlation fidelity ${correlation_fidelity.toFixed(1)}% — inter-variable relationships ` +
+        `${correlation_fidelity >= 80 ? "well-preserved" : "show drift — check heatmap"}. ` +
+        `Privacy (MIA ${mia_auc.toFixed(3)}): ${miaStrong ? "no individual patient identifiable — safe for Distributed Health Network sharing." : miaOk ? "within acceptable range." : "privacy risk — do not share externally."}`
+      )
+    case "researcher":
+      return (
+        `TSTR ratio: ${tstr_ratio.toFixed(2)} — synthetic achieves ${(tstr_ratio * 100).toFixed(0)}% of real-data utility ` +
+        `${tstr_ratio >= 0.85 ? "(strong for exploratory development)" : "(below 0.85 target — limited for complex modelling)"}. ` +
+        `MIA AUC: ${mia_auc.toFixed(3)} — privacy resistance is ` +
+        `${miaStrong ? "excellent (effectively random)" : miaOk ? "acceptable" : "insufficient — do not use in privacy-sensitive contexts"}. ` +
+        `Required: validate any model trained on this data against a held-out real cohort before clinical deployment or publication.`
+      )
+    case "cio": {
+      const miaStatus = miaStrong
+        ? "✓ Strong privacy — meets PHIPA Safe Harbour standard"
+        : miaOk
+        ? "✓ Within acceptable range"
+        : "✗ Exceeds 0.65 — do not deploy"
+      return passed
+        ? `Compliance: PASS. Overall ${overall_score.toFixed(1)}/100 (≥80 ✓) · MIA AUC ${mia_auc.toFixed(3)} — ${miaStatus}. Dataset cleared for internal analytics, AI development, vendor demos, and staff training. Export ready.`
+        : `One or more thresholds not met. Overall: ${overall_score.toFixed(1)}/100 · MIA AUC: ${mia_auc.toFixed(3)} — ${miaStatus}. Consult your Privacy Officer before deployment.`
+    }
+    default:
+      return `Overall: ${overall_score.toFixed(1)}/100. MIA AUC: ${mia_auc.toFixed(3)}. TSTR: ${tstr_ratio.toFixed(2)}. ${passed ? "Ready to export." : "Review recommended."}`
+  }
+}
+
+const PERSONA_ACCENT: Record<string, { bar: string; bg: string; label: string; text: string }> = {
+  nurse: { bar: "bg-blue-400", bg: "bg-blue-50/60 dark:bg-blue-950/20", label: "text-blue-700 dark:text-blue-400", text: "text-blue-900 dark:text-blue-100" },
+  analyst: { bar: "bg-violet-400", bg: "bg-violet-50/60 dark:bg-violet-950/20", label: "text-violet-700 dark:text-violet-400", text: "text-violet-900 dark:text-violet-100" },
+  population_health: { bar: "bg-emerald-400", bg: "bg-emerald-50/60 dark:bg-emerald-950/20", label: "text-emerald-700 dark:text-emerald-400", text: "text-emerald-900 dark:text-emerald-100" },
+  researcher: { bar: "bg-amber-400", bg: "bg-amber-50/60 dark:bg-amber-950/20", label: "text-amber-700 dark:text-amber-400", text: "text-amber-900 dark:text-amber-100" },
+  cio: { bar: "bg-slate-400", bg: "bg-slate-50/60 dark:bg-slate-950/20", label: "text-slate-700 dark:text-slate-400", text: "text-slate-900 dark:text-slate-100" },
+}
 
 export default function VerifyStep() {
   const { state, dispatch } = usePipeline()
   const { sessionId, fidelityReport, role } = state
   const persona = PERSONAS.find((p) => p.key === role)
+  const accent = PERSONA_ACCENT[role] ?? PERSONA_ACCENT.analyst
   const [loading, setLoading] = useState(false)
   const [selectedCol, setSelectedCol] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
@@ -59,10 +126,6 @@ export default function VerifyStep() {
       setSelectedCol(fidelityReport.column_scores[0].column)
     }
   }, [fidelityReport, selectedCol])
-
-  const agentMessage = fidelityReport
-    ? `I have the fidelity report for a ${persona?.label}. Overall score: ${fidelityReport.overall_score.toFixed(1)}/100. Distribution fidelity: ${fidelityReport.distribution_fidelity.toFixed(1)}%. Correlation fidelity: ${fidelityReport.correlation_fidelity.toFixed(1)}%. MIA AUC: ${fidelityReport.mia_auc.toFixed(3)}. TSTR ratio: ${fidelityReport.tstr_ratio.toFixed(2)}. Please interpret these results and explain what they mean for the intended use case.`
-    : `Running fidelity verification for a ${persona?.label}…`
 
   const passed =
     fidelityReport !== null &&
@@ -134,7 +197,6 @@ export default function VerifyStep() {
               )}
             />
             <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8 pl-7 pr-6 py-6">
-              {/* Left: icon + title + description */}
               <div className="flex items-start gap-4 flex-1 min-w-0">
                 <div
                   className={cn(
@@ -169,12 +231,11 @@ export default function VerifyStep() {
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {passed
                       ? "All scores within acceptable thresholds. Dataset is cleared for use."
-                      : "One or more metrics are below recommended thresholds. Review agent commentary before use."}
+                      : "One or more metrics are below recommended thresholds. Review the insight card before use."}
                   </p>
                 </div>
               </div>
 
-              {/* Right: big score */}
               <div className="flex items-center gap-5 flex-shrink-0 md:border-l md:pl-8">
                 <div>
                   <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
@@ -231,7 +292,7 @@ export default function VerifyStep() {
             />
           </div>
 
-          {/* Charts — row A: gauge + distribution */}
+          {/* Charts row A: gauge + distribution */}
           <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
             <Card>
               <CardHeader className="pb-2">
@@ -257,7 +318,7 @@ export default function VerifyStep() {
             </Card>
           </div>
 
-          {/* Charts — row B: correlation heatmap full-width */}
+          {/* Charts row B: correlation heatmap */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Correlation Structure</CardTitle>
@@ -271,16 +332,22 @@ export default function VerifyStep() {
             </CardContent>
           </Card>
 
-          {/* Agent + download row */}
+          {/* Role insight + download */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AgentPanel
-              sessionId={sessionId}
-              message={agentMessage}
-              role={role}
-              active={!loading && fidelityReport !== null}
-              className="h-full min-h-[400px]"
-            />
+            {/* Role insight (replaces agent panel) */}
+            <div className={cn("relative overflow-hidden rounded-lg border", accent.bg)}>
+              <div className={cn("absolute inset-x-0 top-0 h-0.5", accent.bar)} />
+              <div className="p-4">
+                <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", accent.label)}>
+                  {persona?.label} Perspective
+                </p>
+                <p className={cn("text-sm leading-relaxed", accent.text)}>
+                  {getRoleInsight(role, fidelityReport)}
+                </p>
+              </div>
+            </div>
 
+            {/* Download */}
             <div className="space-y-4">
               <Card className="relative overflow-hidden">
                 <div
