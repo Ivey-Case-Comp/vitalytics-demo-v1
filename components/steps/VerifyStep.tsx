@@ -78,12 +78,12 @@ function getRoleInsight(role: string, report: FidelityReport): string {
   }
 }
 
-const PERSONA_ACCENT: Record<string, { bar: string; bg: string; label: string; text: string }> = {
-  nurse: { bar: "bg-blue-400", bg: "bg-blue-50/60 dark:bg-blue-950/20", label: "text-blue-700 dark:text-blue-400", text: "text-blue-900 dark:text-blue-100" },
-  analyst: { bar: "bg-violet-400", bg: "bg-violet-50/60 dark:bg-violet-950/20", label: "text-violet-700 dark:text-violet-400", text: "text-violet-900 dark:text-violet-100" },
-  population_health: { bar: "bg-emerald-400", bg: "bg-emerald-50/60 dark:bg-emerald-950/20", label: "text-emerald-700 dark:text-emerald-400", text: "text-emerald-900 dark:text-emerald-100" },
-  researcher: { bar: "bg-amber-400", bg: "bg-amber-50/60 dark:bg-amber-950/20", label: "text-amber-700 dark:text-amber-400", text: "text-amber-900 dark:text-amber-100" },
-  cio: { bar: "bg-slate-400", bg: "bg-slate-50/60 dark:bg-slate-950/20", label: "text-slate-700 dark:text-slate-400", text: "text-slate-900 dark:text-slate-100" },
+const PERSONA_ACCENT: Record<string, { bar: string; label: string }> = {
+  nurse:             { bar: "bg-blue-400",    label: "text-blue-600 dark:text-blue-400" },
+  analyst:           { bar: "bg-violet-400",  label: "text-violet-600 dark:text-violet-400" },
+  population_health: { bar: "bg-emerald-400", label: "text-emerald-600 dark:text-emerald-400" },
+  researcher:        { bar: "bg-amber-400",   label: "text-amber-600 dark:text-amber-400" },
+  cio:               { bar: "bg-slate-400",   label: "text-slate-600 dark:text-slate-400" },
 }
 
 export default function VerifyStep() {
@@ -335,13 +335,13 @@ export default function VerifyStep() {
           {/* Role insight + download */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Role insight (replaces agent panel) */}
-            <div className={cn("relative overflow-hidden rounded-lg border", accent.bg)}>
-              <div className={cn("absolute inset-x-0 top-0 h-0.5", accent.bar)} />
-              <div className="p-4">
-                <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-2", accent.label)}>
+            <div className="relative overflow-hidden rounded-xl border bg-card">
+              <div className={cn("absolute inset-y-0 left-0 w-1", accent.bar)} />
+              <div className="pl-5 pr-4 py-4">
+                <p className={cn("text-[10px] font-semibold uppercase tracking-widest mb-2.5", accent.label)}>
                   {persona?.label} Perspective
                 </p>
-                <p className={cn("text-sm leading-relaxed", accent.text)}>
+                <p className="text-sm text-foreground leading-relaxed">
                   {getRoleInsight(role, fidelityReport)}
                 </p>
               </div>
