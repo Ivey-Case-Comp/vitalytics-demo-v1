@@ -12,10 +12,12 @@ import {
   ShieldCheck,
   LineChart,
 } from "lucide-react"
+import DemoPreloader from "@/components/DemoPreloader"
 
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
+      <DemoPreloader />
       {/* Nav */}
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">

@@ -26,6 +26,16 @@ export async function createSession(): Promise<{ session_id: string }> {
   return request<{ session_id: string }>("/session", { method: "POST" });
 }
 
+export async function preWarmDemo(): Promise<{ sessionId: string; metadata: DatasetMetadata } | null> {
+  try {
+    const { session_id } = await createSession();
+    const res = await loadDemo(session_id);
+    return { sessionId: session_id, metadata: res.metadata };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Upload / Demo ────────────────────────────────────────────────────────────
 
 export interface UploadResponse {

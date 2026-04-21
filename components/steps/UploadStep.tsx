@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Upload, Database, Lock, Shield, ArrowRight, Sparkles } from "lucide-react"
+import { Upload, Database, Lock, Shield, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react"
 import { usePipeline } from "@/app/pipeline/context"
 import { createSession, loadDemo, uploadCSV } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -29,8 +29,14 @@ export default function UploadStep() {
       })
   }, [state.sessionId, dispatch])
 
+  const demoPreloaded = !!(state.sessionId && state.metadata && state.demoMode)
+
   async function handleLoadDemo() {
     if (!state.sessionId) return
+    if (demoPreloaded) {
+      dispatch({ type: "SET_STEP", step: 2 })
+      return
+    }
     setLoading("demo")
     setError(null)
     try {
@@ -93,32 +99,60 @@ export default function UploadStep() {
           {/* Demo card — primary action */}
           <button
             onClick={handleLoadDemo}
-            disabled={loading !== null || !state.sessionId}
-            className="group w-full text-left relative overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/[0.04] to-transparent hover:border-primary/60 hover:shadow-md transition-all p-5 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={loading !== null || (!state.sessionId && !demoPreloaded)}
+            className={cn(
+              "group w-full text-left relative overflow-hidden rounded-xl border-2 bg-gradient-to-br to-transparent hover:shadow-md transition-all p-5 disabled:opacity-60 disabled:cursor-not-allowed",
+              demoPreloaded
+                ? "border-emerald-400/60 from-emerald-500/[0.06] hover:border-emerald-500/80"
+                : "border-primary/30 from-primary/[0.04] hover:border-primary/60"
+            )}
           >
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
+            <div className={cn(
+              "absolute inset-x-0 top-0 h-0.5",
+              demoPreloaded
+                ? "bg-gradient-to-r from-emerald-400/40 via-emerald-500 to-emerald-400/40"
+                : "bg-gradient-to-r from-primary/40 via-primary to-primary/40"
+            )} />
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary/15 transition-colors">
-                <Database className="h-5 w-5" />
+              <div className={cn(
+                "h-12 w-12 flex-shrink-0 rounded-lg border flex items-center justify-center transition-colors",
+                demoPreloaded
+                  ? "bg-emerald-50 border-emerald-200/70 text-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-900/50"
+                  : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary/15"
+              )}>
+                {demoPreloaded ? <CheckCircle2 className="h-5 w-5" /> : <Database className="h-5 w-5" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-foreground">Synthea Ontario Demo</h3>
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">
-                    Recommended
-                  </span>
+                  {demoPreloaded ? (
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 dark:text-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-900/50">
+                      Ready
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">
+                      Recommended
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   1,000 synthetic patients · 17 columns · York Region demographics
                 </p>
               </div>
               <div className="flex-shrink-0">
-                <div className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-md font-semibold text-sm group-hover:bg-primary/90 transition-colors">
-                  {loading === "demo" ? "Loading…" : "Load"}
-                  {loading !== "demo" && (
+                {demoPreloaded ? (
+                  <div className="inline-flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-md font-semibold text-sm group-hover:bg-emerald-700 transition-colors">
+                    Continue
                     <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-md font-semibold text-sm group-hover:bg-primary/90 transition-colors">
+                    {loading === "demo" ? "Loading…" : "Load"}
+                    {loading !== "demo" && (
+                      <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </button>
