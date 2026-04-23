@@ -57,21 +57,24 @@ def apply_clinical_constraints(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
                 replacements = np.random.choice(VALID_ICD_CODES, invalid_mask.sum())
                 df.loc[invalid_mask, col] = replacements
 
-    # ── Age coherence: if AGE=0 and GLUCOSE is provided, keep as infant ───
+    # ── Age coherence: round age to whole numbers ─────────────────────────
     age_col = col_upper.get("AGE")
     if age_col:
-        df[age_col] = df[age_col].round().astype("Int64")
+        df[age_col] = pd.to_numeric(df[age_col], errors="coerce").round().astype("float64")
 
     # ── Round numeric columns to sensible precision ───────────────────────
     for upper, real_col in col_upper.items():
-        if upper == "BMI":
-            df[real_col] = df[real_col].round(1)
-        elif upper in ("GLUCOSE", "LOS_DAYS"):
-            df[real_col] = df[real_col].round(1)
-        elif upper in ("SYSTOLIC_BP", "DIASTOLIC_BP", "AGE"):
-            df[real_col] = df[real_col].round().astype("Int64")
-        elif upper == "TOTAL_CLAIM_COST":
-            df[real_col] = df[real_col].round(2)
+        try:
+            if upper == "BMI":
+                df[real_col] = pd.to_numeric(df[real_col], errors="coerce").round(1)
+            elif upper in ("GLUCOSE", "LOS_DAYS"):
+                df[real_col] = pd.to_numeric(df[real_col], errors="coerce").round(1)
+            elif upper in ("SYSTOLIC_BP", "DIASTOLIC_BP", "AGE"):
+                df[real_col] = pd.to_numeric(df[real_col], errors="coerce").round().astype("float64")
+            elif upper == "TOTAL_CLAIM_COST":
+                df[real_col] = pd.to_numeric(df[real_col], errors="coerce").round(2)
+        except Exception:
+            pass
 
     # ── Drop rows that are entirely NaN (shouldn't happen but defensive) ──
     df = df.dropna(how="all")

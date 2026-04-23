@@ -59,7 +59,12 @@ export async function uploadCSV(sessionId: string, file: File): Promise<UploadRe
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    let msg = text;
+    try { msg = (JSON.parse(text) as { detail?: string }).detail ?? text; } catch { /* use raw text */ }
+    throw new Error(msg);
+  }
   return res.json();
 }
 

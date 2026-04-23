@@ -106,16 +106,60 @@ async def create_session():
 
 # ─── Upload ───────────────────────────────────────────────────────────────────
 
+def _read_csv_robust(path: Path) -> pd.DataFrame:
+    """Try common encodings and delimiters so any real-world healthcare CSV parses."""
+    for encoding in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
+        for sep in (",", ";", "\t", "|"):
+            try:
+                df = pd.read_csv(path, encoding=encoding, sep=sep, low_memory=False)
+                if df.shape[1] >= 2 or (df.shape[1] == 1 and sep == ","):
+                    return df
+            except Exception:
+                continue
+    raise ValueError(
+        "Could not parse the CSV file. Make sure it is UTF-8 or Latin-1 encoded "
+        "with comma, semicolon, tab, or pipe delimiters."
+    )
+
+
 @app.post("/upload/{session_id}")
 async def upload_file(session_id: str, file: UploadFile = File(...)):
     _ensure_session(session_id)
-    file_path = UPLOAD_DIR / f"{session_id}_{file.filename}"
+    filename = (file.filename or "upload.csv").strip()
+    if not filename.lower().endswith(".csv"):
+        raise HTTPException(400, "Only CSV files are supported. Please upload a .csv file.")
+
     content = await file.read()
+    if not content:
+        raise HTTPException(400, "The uploaded file is empty.")
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(400, "File exceeds the 50 MB limit.")
+
+    file_path = UPLOAD_DIR / f"{session_id}_{filename}"
     file_path.write_bytes(content)
+
     try:
-        df = pd.read_csv(file_path)
-        table = (file.filename or "dataset").replace(".csv", "")
+        df = _read_csv_robust(file_path)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    if df.empty or len(df) < 5:
+        raise HTTPException(400, f"Dataset too small — only {len(df)} row(s) found. Need at least 5 rows.")
+
+    # Drop columns that are 100 % empty so they don't confuse metadata extraction
+    df = df.dropna(axis=1, how="all")
+    if df.empty:
+        raise HTTPException(400, "All columns in the CSV are empty.")
+
+    try:
+        table = filename.removesuffix(".csv").removesuffix(".CSV") or "dataset"
         meta = extract_metadata(df, table_name=table)
+        if not meta.get("columns"):
+            raise HTTPException(
+                400,
+                "No usable columns found after privacy filtering. "
+                "Ensure the CSV contains non-identifier columns (not just names/IDs/dates)."
+            )
         jobs[session_id].update({
             "metadata": meta,
             "real_path": str(file_path),
@@ -130,6 +174,8 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
             "metadata": meta,
             "demo": False,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Metadata extraction failed: {str(e)}")
 

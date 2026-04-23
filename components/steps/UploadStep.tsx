@@ -52,8 +52,12 @@ export default function UploadStep() {
   }
 
   async function handleFileUpload(file: File) {
-    if (!state.sessionId || !file.name.endsWith(".csv")) {
-      setError("Please upload a CSV file.")
+    if (!state.sessionId) {
+      setError("Session not ready — please wait a moment and try again.")
+      return
+    }
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setError(`"${file.name}" is not a CSV file. Please upload a .csv file.`)
       return
     }
     setLoading("upload")

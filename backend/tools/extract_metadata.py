@@ -37,10 +37,14 @@ def _is_geographic(col_name: str) -> bool:
 def _fit_distribution(series: pd.Series) -> dict[str, Any]:
     """Fit best scipy distribution. Returns distribution name + params."""
     clean = series.dropna().astype(float)
-    if len(clean) < 10:
+    if len(clean) == 0:
+        return {"distribution": "uniform", "params": {"loc": 0.0, "scale": 1.0}}
+    if len(clean) < 10 or clean.nunique() <= 1:
+        lo = float(clean.min()) if len(clean) > 0 else 0.0
+        scale = float(max(clean.max() - clean.min(), 0.01)) if len(clean) > 0 else 1.0
         return {
             "distribution": "uniform",
-            "params": {"loc": float(clean.min()), "scale": float(max(clean.max() - clean.min(), 0.01))},
+            "params": {"loc": lo, "scale": scale},
         }
 
     # Cap at P1/P99 to prevent outlier leakage (SAFEGUARD 3)
@@ -119,24 +123,31 @@ def extract_metadata(df: pd.DataFrame, table_name: str = "dataset") -> dict:
             )
 
         if pd.api.types.is_numeric_dtype(series):
+            clean = series.dropna()
+            if len(clean) == 0:
+                continue  # skip fully-null numeric columns
             col_meta["type"] = "continuous"
-            dist_info = _fit_distribution(series.dropna())
+            dist_info = _fit_distribution(clean)
             col_meta.update(dist_info)
             kept_numeric_cols.append(col)
 
         elif "date" in col.lower() or pd.api.types.is_datetime64_any_dtype(series):
             col_meta["type"] = "datetime"
             try:
-                parsed = pd.to_datetime(series.dropna())
-                col_meta["min"] = str(parsed.min())
-                col_meta["max"] = str(parsed.max())
+                parsed = pd.to_datetime(series.dropna(), infer_datetime_format=True, errors="coerce").dropna()
+                if len(parsed) > 0:
+                    col_meta["min"] = str(parsed.min())
+                    col_meta["max"] = str(parsed.max())
+                else:
+                    col_meta["min"] = "2010-01-01"
+                    col_meta["max"] = "2024-01-01"
             except Exception:
-                col_meta["min"] = str(series.dropna().min())
-                col_meta["max"] = str(series.dropna().max())
+                col_meta["min"] = "2010-01-01"
+                col_meta["max"] = "2024-01-01"
 
         else:
             col_meta["type"] = "categorical"
-            value_counts = series.value_counts(dropna=True)
+            value_counts = series.astype(str).replace("nan", pd.NA).value_counts(dropna=True)
             rare_threshold = 5
 
             # SAFEGUARD 2: Rare category suppression
