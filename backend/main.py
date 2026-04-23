@@ -42,19 +42,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory job store (sufficient for demo)
-jobs: dict[str, dict] = {}
-
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data" / "synthea"
 
-# Vercel's deployment bundle at /var/task is read-only; only /tmp is writable.
-# Locally (no VERCEL env var) keep files next to the backend directory.
+# Vercel's /var/task is read-only; only /tmp is writable.
+# Locally keep files next to the backend directory.
 _on_vercel = bool(os.environ.get("VERCEL"))
 UPLOAD_DIR = Path("/tmp/vitalytics_uploads") if _on_vercel else BASE_DIR / "uploads"
 OUTPUT_DIR = Path("/tmp/vitalytics_outputs") if _on_vercel else BASE_DIR / "outputs"
-UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
+SESSION_DIR = Path("/tmp/vitalytics_sessions") if _on_vercel else BASE_DIR / "sessions"
+for _d in (UPLOAD_DIR, OUTPUT_DIR, SESSION_DIR):
+    _d.mkdir(parents=True, exist_ok=True)
+
+# ─── File-backed session store ────────────────────────────────────────────────
+# Vercel serverless can route consecutive requests to different cold instances,
+# each with an empty in-memory dict. We persist every session to a JSON file in
+# /tmp so the same instance can recover state after a cold start, and so that
+# the most recently active instance can always reconstruct from disk.
+
+_mem: dict[str, dict] = {}  # in-process cache
+
+
+def _session_path(sid: str) -> Path:
+    return SESSION_DIR / f"{sid}.json"
+
+
+def _load_session(sid: str) -> dict | None:
+    p = _session_path(sid)
+    if p.exists():
+        try:
+            return json.loads(p.read_text())
+        except Exception:
+            pass
+    return None
+
+
+def _save_session(sid: str) -> None:
+    try:
+        _session_path(sid).write_text(json.dumps(_mem[sid], default=str))
+    except Exception:
+        pass
+
+
+def _get(sid: str) -> dict:
+    if sid not in _mem:
+        data = _load_session(sid)
+        if data is None:
+            raise HTTPException(
+                404,
+                "Session not found — it may have expired. Please start over.",
+            )
+        _mem[sid] = data
+    return _mem[sid]
+
+
+def _set(sid: str, updates: dict) -> None:
+    _mem[sid].update(updates)
+    _save_session(sid)
 
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
@@ -86,7 +130,7 @@ async def health():
 @app.post("/session")
 async def create_session():
     sid = str(uuid.uuid4())
-    jobs[sid] = {
+    _mem[sid] = {
         "session_id": sid,
         "status": "created",
         "step": 0,
@@ -101,6 +145,7 @@ async def create_session():
         "fidelity": None,
         "conversation": [],
     }
+    _save_session(sid)
     return {"session_id": sid}
 
 
@@ -124,7 +169,7 @@ def _read_csv_robust(path: Path) -> pd.DataFrame:
 
 @app.post("/upload/{session_id}")
 async def upload_file(session_id: str, file: UploadFile = File(...)):
-    _ensure_session(session_id)
+    _get(session_id)  # raises 404 if session missing
     filename = (file.filename or "upload.csv").strip()
     if not filename.lower().endswith(".csv"):
         raise HTTPException(400, "Only CSV files are supported. Please upload a .csv file.")
@@ -160,7 +205,7 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
                 "No usable columns found after privacy filtering. "
                 "Ensure the CSV contains non-identifier columns (not just names/IDs/dates)."
             )
-        jobs[session_id].update({
+        _set(session_id, {
             "metadata": meta,
             "real_path": str(file_path),
             "table_name": table,
@@ -182,14 +227,14 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
 
 @app.post("/load-demo/{session_id}")
 async def load_demo(session_id: str):
-    _ensure_session(session_id)
+    job = _get(session_id)
     demo_path = DATA_DIR / "patients.csv"
     if not demo_path.exists():
         raise HTTPException(404, "Demo data not found. Run backend/scripts/generate_demo_data.py first.")
     try:
         df = pd.read_csv(demo_path)
         meta = extract_metadata(df, table_name="synthea_patients")
-        jobs[session_id].update({
+        _set(session_id, {
             "metadata": meta,
             "real_path": str(demo_path),
             "table_name": "synthea_patients",
@@ -211,31 +256,31 @@ async def load_demo(session_id: str):
 
 @app.get("/hygiene/{session_id}")
 async def run_hygiene(session_id: str):
-    _ensure_session(session_id)
-    meta = jobs[session_id].get("metadata")
+    job = _get(session_id)
+    meta = job.get("metadata")
     if not meta:
         raise HTTPException(400, "No metadata. Upload a file first.")
     issues = check_hygiene(meta)
-    jobs[session_id]["hygiene_issues"] = issues
-    jobs[session_id]["step"] = 2
+    _set(session_id, {"hygiene_issues": issues, "step": 2})
     return {"session_id": session_id, "issues": issues}
 
 
 @app.post("/hygiene/apply/{session_id}")
 async def apply_hygiene_fixes(session_id: str, req: HygieneApprovalRequest):
-    _ensure_session(session_id)
-    issues = jobs[session_id].get("hygiene_issues") or []
-    meta = jobs[session_id].get("metadata") or {}
+    job = _get(session_id)
+    issues = job.get("hygiene_issues") or []
+    meta = job.get("metadata") or {}
     for issue in issues:
         if issue["id"] in req.approved_fixes:
             for col, adj in (issue.get("metadata_fix") or {}).items():
                 if col in meta.get("columns", {}):
                     meta["columns"][col].update(adj)
             issue["applied"] = True
-    jobs[session_id]["metadata"] = meta
-    jobs[session_id]["applied_fixes"] = list(set(
-        jobs[session_id].get("applied_fixes", []) + req.approved_fixes
-    ))
+    _set(session_id, {
+        "metadata": meta,
+        "hygiene_issues": issues,
+        "applied_fixes": list(set(job.get("applied_fixes", []) + req.approved_fixes)),
+    })
     return {"session_id": session_id, "applied": req.approved_fixes, "metadata": meta}
 
 
@@ -243,26 +288,26 @@ async def apply_hygiene_fixes(session_id: str, req: HygieneApprovalRequest):
 
 @app.post("/generate/{session_id}")
 async def start_generation(session_id: str, req: GenerateRequest, background_tasks: BackgroundTasks):
-    _ensure_session(session_id)
-    meta = jobs[session_id].get("metadata")
+    job = _get(session_id)
+    meta = job.get("metadata")
     if not meta:
         raise HTTPException(400, "No metadata. Upload a file first.")
-    jobs[session_id]["status"] = "generating"
-    jobs[session_id]["generation_progress"] = []
+    _set(session_id, {"status": "generating", "generation_progress": []})
     background_tasks.add_task(_run_generation, session_id, meta, req.n_rows, req.model)
     return {"session_id": session_id, "status": "generating"}
 
 
 async def _run_generation(session_id: str, meta: dict, n_rows: int, model: str):
     def progress(msg: str):
-        jobs[session_id]["generation_progress"].append(msg)
+        _mem[session_id]["generation_progress"].append(msg)
+        _save_session(session_id)
     try:
         result = await asyncio.get_running_loop().run_in_executor(
             None, lambda: generate_synthetic(meta, n_rows=n_rows, model=model, progress_callback=progress)
         )
         output_path = OUTPUT_DIR / f"{session_id}_synthetic.csv"
         result["dataframe"].to_csv(output_path, index=False)
-        jobs[session_id].update({
+        _set(session_id, {
             "synthetic_path": str(output_path),
             "generation_result": {
                 "rows_generated": result["rows_generated"],
@@ -273,14 +318,15 @@ async def _run_generation(session_id: str, meta: dict, n_rows: int, model: str):
             "step": 3,
         })
     except Exception as e:
-        jobs[session_id]["status"] = "error"
-        jobs[session_id]["generation_progress"].append(f"Error: {str(e)}")
+        _set(session_id, {
+            "status": "error",
+            "generation_progress": _mem[session_id].get("generation_progress", []) + [f"Error: {str(e)}"],
+        })
 
 
 @app.get("/generate/status/{session_id}")
 async def generation_status(session_id: str):
-    _ensure_session(session_id)
-    job = jobs[session_id]
+    job = _get(session_id)
     return {
         "status": job.get("status"),
         "progress": job.get("generation_progress", []),
@@ -293,17 +339,20 @@ async def generation_status(session_id: str):
 
 @app.get("/verify/{session_id}")
 async def run_verification(session_id: str):
-    _ensure_session(session_id)
-    real_path = jobs[session_id].get("real_path")
-    synth_path = jobs[session_id].get("synthetic_path")
+    job = _get(session_id)
+    real_path = job.get("real_path")
+    synth_path = job.get("synthetic_path")
     if not real_path or not synth_path:
         raise HTTPException(400, "Need both real and synthetic data. Generate first.")
+    if not Path(real_path).exists():
+        raise HTTPException(400, "Original dataset file not found on this server instance. Please start over.")
+    if not Path(synth_path).exists():
+        raise HTTPException(400, "Synthetic dataset file not found on this server instance. Please start over.")
     try:
         result = await asyncio.get_running_loop().run_in_executor(
             None, lambda: verify_fidelity(real_path, synth_path)
         )
-        jobs[session_id]["fidelity"] = result
-        jobs[session_id]["step"] = 4
+        _set(session_id, {"fidelity": result, "step": 4})
         return {"session_id": session_id, "fidelity": result}
     except Exception as e:
         raise HTTPException(500, f"Verification failed: {str(e)}")
@@ -313,8 +362,8 @@ async def run_verification(session_id: str):
 
 @app.get("/preview/{session_id}")
 async def get_preview(session_id: str, n: int = 20):
-    _ensure_session(session_id)
-    path = jobs[session_id].get("synthetic_path")
+    job = _get(session_id)
+    path = job.get("synthetic_path")
     if not path or not Path(path).exists():
         raise HTTPException(404, "Synthetic data not found. Generate first.")
     df = pd.read_csv(path, nrows=n)
@@ -323,8 +372,8 @@ async def get_preview(session_id: str, n: int = 20):
 
 @app.get("/download/{session_id}")
 async def download_synthetic(session_id: str):
-    _ensure_session(session_id)
-    path = jobs[session_id].get("synthetic_path")
+    job = _get(session_id)
+    path = job.get("synthetic_path")
     if not path or not Path(path).exists():
         raise HTTPException(404, "Synthetic data not found.")
     return FileResponse(path, media_type="text/csv", filename=f"vitalytics_synthetic_{session_id[:8]}.csv")
@@ -334,9 +383,7 @@ async def download_synthetic(session_id: str):
 
 @app.post("/chat/stream")
 async def chat_stream(req: ChatRequest):
-    _ensure_session(req.session_id)
-    job = jobs[req.session_id]
-    # Pass full session state to agent (including applied fixes)
+    job = _get(req.session_id)
     agent_state = {**job, "session_id": req.session_id}
 
     async def event_generator():
@@ -353,13 +400,11 @@ async def chat_stream(req: ChatRequest):
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        # Sync any state changes back to jobs store.
-        # synthetic_path is written directly by _run_generation — only overwrite if the agent set it.
-        for key in ("metadata", "hygiene_issues", "generation_result", "fidelity", "conversation"):
-            if key in agent_state:
-                jobs[req.session_id][key] = agent_state[key]
+        updates = {k: agent_state[k] for k in ("metadata", "hygiene_issues", "generation_result", "fidelity", "conversation") if k in agent_state}
         if agent_state.get("synthetic_path"):
-            jobs[req.session_id]["synthetic_path"] = agent_state["synthetic_path"]
+            updates["synthetic_path"] = agent_state["synthetic_path"]
+        if updates:
+            _set(req.session_id, updates)
 
     return StreamingResponse(
         event_generator(),
@@ -372,13 +417,5 @@ async def chat_stream(req: ChatRequest):
 
 @app.get("/jobs/{session_id}")
 async def get_job(session_id: str):
-    _ensure_session(session_id)
-    job = {k: v for k, v in jobs[session_id].items() if k != "conversation"}
+    job = {k: v for k, v in _get(session_id).items() if k != "conversation"}
     return job
-
-
-# ─── Helpers ─────────────────────────────────────────────────────────────────
-
-def _ensure_session(session_id: str):
-    if session_id not in jobs:
-        raise HTTPException(404, f"Session '{session_id}' not found. Create one via POST /api/session.")
