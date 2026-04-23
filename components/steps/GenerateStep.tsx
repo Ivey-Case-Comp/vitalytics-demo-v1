@@ -46,13 +46,13 @@ export default function GenerateStep() {
   const [progressPct, setProgressPct] = useState(0)
 
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || !metadata) return
 
     if (!genStartedRef.current) {
       genStartedRef.current = true
       dispatch({ type: "SET_GEN_STATUS", status: "generating" })
       dispatch({ type: "ADD_GEN_PROGRESS", message: "Initialising generation engine…" })
-      startGeneration(sessionId).catch((e: Error) => {
+      startGeneration(sessionId, metadata).catch((e: Error) => {
         if (e.message.includes("404")) {
           dispatch({ type: "RESET" })
         } else {

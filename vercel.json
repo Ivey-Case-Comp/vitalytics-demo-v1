@@ -6,7 +6,8 @@
     },
     "backend": {
       "entrypoint": "backend",
-      "routePrefix": "/api"
+      "routePrefix": "/api",
+      "bodySizeLimit": "50mb"
     }
   }
 }

@@ -70,17 +70,24 @@ export async function uploadCSV(sessionId: string, file: File): Promise<UploadRe
 
 // ─── Hygiene ──────────────────────────────────────────────────────────────────
 
-export async function runHygiene(sessionId: string): Promise<{ issues: HygieneIssue[] }> {
-  return request(`/hygiene/${sessionId}`);
+export async function runHygiene(
+  sessionId: string,
+  metadata: DatasetMetadata
+): Promise<{ issues: HygieneIssue[] }> {
+  return request(`/hygiene/${sessionId}`, {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId, metadata }),
+  });
 }
 
 export async function applyHygieneFixes(
   sessionId: string,
-  approvedFixes: string[]
+  approvedFixes: string[],
+  metadata?: DatasetMetadata
 ): Promise<{ metadata: DatasetMetadata; applied: string[] }> {
   return request(`/hygiene/apply/${sessionId}`, {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId, approved_fixes: approvedFixes }),
+    body: JSON.stringify({ session_id: sessionId, approved_fixes: approvedFixes, metadata }),
   });
 }
 
@@ -88,12 +95,13 @@ export async function applyHygieneFixes(
 
 export async function startGeneration(
   sessionId: string,
+  metadata: DatasetMetadata,
   nRows = 1000,
   model = "auto"
 ): Promise<{ session_id: string; status: string }> {
   return request(`/generate/${sessionId}`, {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId, n_rows: nRows, model }),
+    body: JSON.stringify({ session_id: sessionId, metadata, n_rows: nRows, model }),
   });
 }
 

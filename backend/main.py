@@ -103,12 +103,19 @@ def _set(sid: str, updates: dict) -> None:
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
 
+class HygieneRequest(BaseModel):
+    session_id: str
+    metadata: dict                 # sent from frontend — no server state lookup needed
+    applied_fixes: list[str] = []
+
 class HygieneApprovalRequest(BaseModel):
     session_id: str
     approved_fixes: list[str]
+    metadata: dict | None = None   # optional; if supplied, updates server state
 
 class GenerateRequest(BaseModel):
     session_id: str
+    metadata: dict                 # sent from frontend — no server state lookup needed
     n_rows: int = 1000
     model: str = "auto"
 
@@ -167,9 +174,25 @@ def _read_csv_robust(path: Path) -> pd.DataFrame:
     )
 
 
+def _ensure_or_create(session_id: str) -> dict:
+    """Get session if it exists; otherwise create a fresh one (handles cross-instance cold starts)."""
+    try:
+        return _get(session_id)
+    except HTTPException:
+        _mem[session_id] = {
+            "session_id": session_id, "status": "created", "step": 0,
+            "real_path": None, "metadata": None, "table_name": "dataset",
+            "hygiene_issues": None, "applied_fixes": [], "synthetic_path": None,
+            "generation_result": None, "generation_progress": [], "fidelity": None,
+            "conversation": [],
+        }
+        _save_session(session_id)
+        return _mem[session_id]
+
+
 @app.post("/upload/{session_id}")
 async def upload_file(session_id: str, file: UploadFile = File(...)):
-    _get(session_id)  # raises 404 if session missing
+    _ensure_or_create(session_id)
     filename = (file.filename or "upload.csv").strip()
     if not filename.lower().endswith(".csv"):
         raise HTTPException(400, "Only CSV files are supported. Please upload a .csv file.")
@@ -227,7 +250,7 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
 
 @app.post("/load-demo/{session_id}")
 async def load_demo(session_id: str):
-    job = _get(session_id)
+    job = _ensure_or_create(session_id)
     demo_path = DATA_DIR / "patients.csv"
     if not demo_path.exists():
         raise HTTPException(404, "Demo data not found. Run backend/scripts/generate_demo_data.py first.")
@@ -254,33 +277,52 @@ async def load_demo(session_id: str):
 
 # ─── Hygiene ─────────────────────────────────────────────────────────────────
 
-@app.get("/hygiene/{session_id}")
-async def run_hygiene(session_id: str):
-    job = _get(session_id)
-    meta = job.get("metadata")
+@app.post("/hygiene/{session_id}")
+async def run_hygiene(session_id: str, req: HygieneRequest):
+    # Stateless: metadata comes from the frontend, no session state lookup required.
+    meta = req.metadata
     if not meta:
-        raise HTTPException(400, "No metadata. Upload a file first.")
+        raise HTTPException(400, "No metadata provided.")
     issues = check_hygiene(meta)
-    _set(session_id, {"hygiene_issues": issues, "step": 2})
+    # Best-effort: persist to session if we can (helps warm-instance status checks)
+    try:
+        job = _ensure_or_create(session_id)
+        _set(session_id, {"metadata": meta, "hygiene_issues": issues, "step": 2,
+                          "applied_fixes": req.applied_fixes})
+    except Exception:
+        pass
     return {"session_id": session_id, "issues": issues}
 
 
 @app.post("/hygiene/apply/{session_id}")
 async def apply_hygiene_fixes(session_id: str, req: HygieneApprovalRequest):
-    job = _get(session_id)
-    issues = job.get("hygiene_issues") or []
-    meta = job.get("metadata") or {}
+    # Use metadata from request body if provided; otherwise fall back to session.
+    meta = req.metadata or {}
+    if not meta:
+        job = _get(session_id)
+        meta = job.get("metadata") or {}
+        issues = job.get("hygiene_issues") or []
+    else:
+        try:
+            job = _get(session_id)
+            issues = job.get("hygiene_issues") or []
+        except HTTPException:
+            issues = []
     for issue in issues:
         if issue["id"] in req.approved_fixes:
             for col, adj in (issue.get("metadata_fix") or {}).items():
                 if col in meta.get("columns", {}):
                     meta["columns"][col].update(adj)
             issue["applied"] = True
-    _set(session_id, {
-        "metadata": meta,
-        "hygiene_issues": issues,
-        "applied_fixes": list(set(job.get("applied_fixes", []) + req.approved_fixes)),
-    })
+    try:
+        _ensure_or_create(session_id)
+        _set(session_id, {
+            "metadata": meta,
+            "hygiene_issues": issues,
+            "applied_fixes": list(set(req.approved_fixes)),
+        })
+    except Exception:
+        pass
     return {"session_id": session_id, "applied": req.approved_fixes, "metadata": meta}
 
 
@@ -288,11 +330,12 @@ async def apply_hygiene_fixes(session_id: str, req: HygieneApprovalRequest):
 
 @app.post("/generate/{session_id}")
 async def start_generation(session_id: str, req: GenerateRequest, background_tasks: BackgroundTasks):
-    job = _get(session_id)
-    meta = job.get("metadata")
+    # Stateless: metadata comes from the frontend.
+    meta = req.metadata
     if not meta:
-        raise HTTPException(400, "No metadata. Upload a file first.")
-    _set(session_id, {"status": "generating", "generation_progress": []})
+        raise HTTPException(400, "No metadata provided.")
+    job = _ensure_or_create(session_id)
+    _set(session_id, {"metadata": meta, "status": "generating", "generation_progress": []})
     background_tasks.add_task(_run_generation, session_id, meta, req.n_rows, req.model)
     return {"session_id": session_id, "status": "generating"}
 

@@ -96,19 +96,19 @@ export default function HygieneStep() {
   const accent = PERSONA_ACCENT[role] ?? PERSONA_ACCENT.analyst
 
   useEffect(() => {
-    if (!sessionId || hygieneIssues !== null) return
+    if (!sessionId || !state.metadata || hygieneIssues !== null) return
     setLoading(true)
-    runHygiene(sessionId)
+    runHygiene(sessionId, state.metadata)
       .then(({ issues }) => dispatch({ type: "SET_HYGIENE_ISSUES", issues }))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [sessionId, hygieneIssues, dispatch])
+  }, [sessionId, state.metadata, hygieneIssues, dispatch])
 
   async function handleFix(issueId: string) {
     if (!sessionId) return
     setApplying(issueId)
     try {
-      await applyHygieneFixes(sessionId, [issueId])
+      await applyHygieneFixes(sessionId, [issueId], state.metadata ?? undefined)
       dispatch({ type: "APPLY_FIX", issueId })
     } catch (e) {
       console.error(e)
